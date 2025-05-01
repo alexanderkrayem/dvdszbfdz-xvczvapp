@@ -1,8 +1,6 @@
 // src/App.jsx
 import React, { useEffect } from 'react';
-import MainPanel from './components/MainPanel'; // Import the component
-// We commented out App.css because Tailwind handles styles via index.css
-// import './App.css'
+import MainPanel from './components/MainPanel'; // Import your MainPanel component
 
 // Access the Telegram Web App object safely
 const tg = window.Telegram?.WebApp;
@@ -10,44 +8,36 @@ const tg = window.Telegram?.WebApp;
 function App() {
 
   useEffect(() => {
+    // This code runs once when the app starts
     if (tg) {
+      console.log("Telegram WebApp SDK found. Calling tg.ready().");
       tg.ready(); // IMPORTANT: Tell Telegram the app is ready
-      console.log("Telegram WebApp SDK loaded:", tg);
-      console.log("InitData Unsafe:", tg.initDataUnsafe);
 
-      // Example: If you want to show a username (if available)
-      // You could pass this down to MainPanel as a prop later
+      // Log initial data (useful for debugging in Telegram)
+      console.log("InitData Unsafe:", tg.initDataUnsafe);
       if (tg.initDataUnsafe?.user) {
         console.log("User:", tg.initDataUnsafe.user);
       } else {
-        console.log("User data not available (maybe running outside Telegram?)");
+        console.log("User data not available within initDataUnsafe.");
       }
-
-      // Example: Configure the main button (optional for now)
-      // tg.MainButton.setText("View Cart");
-      // tg.MainButton.show();
-      // tg.MainButton.onClick(() => { /* Handle cart viewing */ });
-
     } else {
-      console.log("Telegram WebApp SDK not found (running in browser?).");
+      // This message will likely show when running in a normal browser
+      console.warn("Telegram WebApp SDK (window.Telegram.WebApp) not found. App might not function fully outside Telegram.");
     }
 
-    // Cleanup function (optional but good practice)
+    // Cleanup function (optional)
     return () => {
       if (tg) {
-          // Example: Hide main button if shown
-          // tg.MainButton.offClick(/* your handler */); // Remove specific listener
-          // tg.MainButton.hide();
+        // You might add cleanup here later if you use things like tg.MainButton.onClick
       }
     }
-  }, []); // Empty dependency array means this runs once when the component mounts
+  }, []); // Empty dependency array means run once on mount
 
-  // We will add Telegram specific hooks/logic here later
-  // For now, just render the MainPanel
-
+  // Render the MainPanel component which now handles its own data fetching
   return (
-    <MainPanel /> // Render your MainPanel component
+    <MainPanel />
   );
+
 }
 
 export default App;
