@@ -15,6 +15,10 @@ const MainPanel = () => {
     const [fetchedProducts, setFetchedProducts] = useState([]); // To store products from API
     const [isLoadingProducts, setIsLoadingProducts] = useState(true); // Track loading state
     const [productError, setProductError] = useState(null); // Track fetching errors
+   // --- NEW: State for suppliers ---
+    const [fetchedSuppliers, setFetchedSuppliers] = useState([]);
+    const [isLoadingSuppliers, setIsLoadingSuppliers] = useState(true);
+    const [supplierError, setSupplierError] = useState(null);
 
     // --- Keep sample data for deals and suppliers for now ---
     const deals = [
@@ -36,30 +40,30 @@ const MainPanel = () => {
         }
     ];
 
-    const suppliers = [
-        {
-            id: 1,
-            name: "شركة المعدات الطبية",
-            category: "معدات طبية",
-            location: "دبي",
-            rating: 4.8,
-            image: "linear-gradient(to right, #3B82F6, #1D4ED8)",
-            description: "موزع رئيسي للمعدات الطبية وأدوات طب الأسنان",
-            // products: [1, 2, 3], // No longer needed here if fetched
-            contact: { phone: "+971 XX XXX XXXX", email: "info@medical-equipment.com", website: "www.medical-equipment.com" }
-        },
-        {
-            id: 2,
-            name: "مستلزمات طب الأسنان المتحدة",
-            category: "مستلزمات طبية",
-            location: "أبو ظبي",
-            rating: 4.6,
-            image: "linear-gradient(to right, #10B981, #059669)",
-            description: "متخصصون في توريد أحدث مستلزمات طب الأسنان",
-            // products: [4, 5, 6], // No longer needed here if fetched
-            contact: { phone: "+971 XX XXX XXXX", email: "info@dental-supplies.com", website: "www.dental-supplies.com" }
+    // --- NEW: useEffect to fetch suppliers ---
+useEffect(() => {
+    const fetchSuppliers = async () => {
+        setIsLoadingSuppliers(true);
+        setSupplierError(null);
+        try {
+            const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/suppliers`;
+            console.log("Fetching suppliers from:", apiUrl);
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            setFetchedSuppliers(data);
+        } catch (error) {
+            console.error("Failed to fetch suppliers:", error);
+            setSupplierError(error.message);
+        } finally {
+            setIsLoadingSuppliers(false);
         }
-    ];
+    };
+
+    fetchSuppliers();
+}, []); // Empty dependency array, runs once on mount
 
     // --- Removed the hardcoded 'products' array ---
 
@@ -325,34 +329,60 @@ const MainPanel = () => {
                 {activeSection === 'suppliers' && (
                     <div className="space-y-4">
                         <h2 className="text-xl font-bold mb-4 text-gray-800">الموردون المشاركون</h2>
-                        {suppliers.map(supplier => (
-                             <motion.div
-                                key={supplier.id}
-                                className="bg-white rounded-xl shadow-md overflow-hidden cursor-pointer"
-                                whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
-                                onClick={() => setSelectedSupplier(supplier)}
-                            >
-                                <div
-                                    className="h-24 w-full flex items-center justify-center text-white"
-                                    style={{ background: supplier.image }}
-                                >
-                                    <h3 className="text-lg font-bold">{supplier.name}</h3>
-                                </div>
-                                <div className="p-4">
-                                    <div className="flex items-center justify-between mb-2 text-sm">
-                                        <span className="text-gray-600">{supplier.category}</span>
-                                        <div className="flex items-center gap-1">
-                                            <Star className="h-4 w-4 text-yellow-400 fill-current" />
-                                            <span>{supplier.rating}</span>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center text-sm text-gray-600 gap-1">
-                                        <MapPin className="h-4 w-4" />
-                                        <span>{supplier.location}</span>
-                                    </div>
-                                </div>
-                            </motion.div>
-                        ))}
+
+{/* --- 1. Show loading message --- */}
+{isLoadingSuppliers && <p className="text-center text-gray-500">جار تحميل الموردين...</p>}
+
+{/* --- 2. Show error message if fetching failed --- */}
+{supplierError && <p className="text-center text-red-500">خطأ في تحميل الموردين: {supplierError}</p>}
+
+{/* --- 3. Show suppliers list ONLY if NOT loading AND NO error --- */}
+{!isLoadingSuppliers && !supplierError && (
+    <> {/* Using a Fragment <>...</> allows multiple elements here */}
+        {/* Map over the 'fetchedSuppliers' state variable */}
+        {fetchedSuppliers.map(supplier => (
+             <motion.div
+                key={supplier.id} // Use the unique ID from the database
+                className="bg-white rounded-xl shadow-md overflow-hidden cursor-pointer"
+                whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
+                onClick={() => setSelectedSupplier(supplier)} // Keep this if you want to view details later
+            >
+                <div
+                    className="h-24 w-full flex items-center justify-center text-white bg-gray-400" // Added a fallback background color
+                    // Use the 'image_url' field from the database data
+                    style={{ background: supplier.image_url || 'linear-gradient(to right, #6b7280, #4b5563)' }} // Add a default gradient if image_url is missing
+                >
+                    {/* Use the 'name' field from the database data */}
+                    <h3 className="text-lg font-bold">{supplier.name}</h3>
+                </div>
+                <div className="p-4">
+                    <div className="flex items-center justify-between mb-2 text-sm">
+                        {/* Use the 'category' field, provide default text if missing */}
+                        <span className="text-gray-600">{supplier.category || 'غير مصنف'}</span>
+                        {/* Only show rating if the 'rating' field exists */}
+                        {supplier.rating && (
+                            <div className="flex items-center gap-1">
+                                <Star className="h-4 w-4 text-yellow-400 fill-current" />
+                                {/* Use the 'rating' field */}
+                                <span>{supplier.rating}</span>
+                            </div>
+                        )}
+                    </div>
+                    <div className="flex items-center text-sm text-gray-600 gap-1">
+                        <MapPin className="h-4 w-4" />
+                        {/* Use the 'location' field, provide default text if missing */}
+                        <span>{supplier.location || 'غير محدد'}</span>
+                    </div>
+                </div>
+            </motion.div>
+        ))}
+    </>
+)}
+
+ {/* --- 4. Show message if loading finished, no error, but no suppliers found --- */}
+ {!isLoadingSuppliers && !supplierError && fetchedSuppliers.length === 0 && (
+    <p className="text-center text-gray-500">لا يوجد موردون لعرضهم حالياً.</p>
+ )}
                     </div>
                 )}
             </div>
