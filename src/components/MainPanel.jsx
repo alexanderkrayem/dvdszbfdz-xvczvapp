@@ -1,15 +1,53 @@
 // src/components/MainPanel.jsx
 
 import React, { useState, useEffect } from 'react'; // Ensure useEffect is imported
-import { Clock, MapPin, Star, ShoppingCart, Search, X } from 'lucide-react';
+import { Clock, Plus, Minus, Trash2, MapPin, Star, ShoppingCart, Search, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const MainPanel = () => {
+const MainPanel = ({ telegramUser }) => {
     const [activeSection, setActiveSection] = useState('exhibitions');
     const [selectedSupplier, setSelectedSupplier] = useState(null);
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [showCart, setShowCart] = useState(false);
-    const [cart, setCart] = useState([]);
+    // --- NEW: State for fetched cart ---
+    const [cartItems, setCartItems] = useState([]);
+    const [isLoadingCart, setIsLoadingCart] = useState(false); // Initially false, load when user is known
+    const [cartError, setCartError] = useState(null);
+
+    // Inside MainPanel component
+
+// --- NEW: useEffect to fetch cart ---
+useEffect(() => {
+    // Only fetch if we have a user ID
+    if (!telegramUser?.id) {
+        // console.log("Waiting for user info to fetch cart...");
+        return; // Exit if no user ID yet
+    }
+
+    const fetchCart = async () => {
+        setIsLoadingCart(true);
+        setCartError(null);
+        console.log(`Fetching cart for user: ${telegramUser.id}`);
+        try {
+            const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/cart?userId=${telegramUser.id}`;
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            console.log("Cart data received:", data);
+            setCartItems(data);
+        } catch (error) {
+            console.error("Failed to fetch cart:", error);
+            setCartError(error.message);
+        } finally {
+            setIsLoadingCart(false);
+        }
+    };
+
+    fetchCart();
+    // This effect depends on telegramUser.id, so it runs when the ID becomes available
+}, [telegramUser?.id]); // Dependency array includes user ID
 
     // --- State for fetched product data ---
     const [fetchedProducts, setFetchedProducts] = useState([]); // To store products from API
@@ -95,79 +133,170 @@ useEffect(() => {
     }, []); // Empty array means run once on component mount
 
 
-    const addToCart = (product) => {
-        if (selectedProduct) return;
-        setCart(currentCart => {
-            const existingItem = currentCart.find(item => item.id === product.id);
-            if (existingItem) {
-                return currentCart.map(item =>
-                    item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
-                );
-            } else {
-                return [...currentCart, { ...product, quantity: 1 }];
-            }
+     // Inside MainPanel component
+
+ const addToCart = async (product) => {
+    if (!telegramUser?.id) {
+        alert("Cannot add to cart: User information not loaded."); // Or handle more gracefully
+        return;
+    }
+    if (!product?.id) {
+        console.error("Cannot add to cart: Invalid product data", product);
+        return;
+    }
+
+    console.log(`Adding product ${product.id} to cart for user ${telegramUser.id}`);
+    // Consider adding loading state for the specific button maybe?
+
+    try {
+        const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/cart`;
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                userId: telegramUser.id,
+                productId: product.id,
+                quantity: 1 // Send quantity 1 to add/increment by 1
+            }),
         });
-        console.log(`${product.name} added to cart.`);
-    };
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const updatedItem = await response.json();
+        console.log("Item added/updated:", updatedItem);
+
+        // --- Update frontend state ---
+        // Find if item already exists in local state
+        const existingItemIndex = cartItems.findIndex(item => item.product_id === updatedItem.product_id);
+
+        if (existingItemIndex > -1) {
+            // Item exists, update its quantity
+            const newCartItems = [...cartItems];
+            newCartItems[existingItemIndex] = {
+                ...newCartItems[existingItemIndex], // Keep existing product details
+                 quantity: updatedItem.quantity // Update quantity from backend response
+            };
+             setCartItems(newCartItems);
+        } else {
+            // Item is new, add it (need to merge product details from original product)
+            // The backend currently only returns the cart_item row.
+            // We either need the backend GET /cart to return full product details
+            // OR we merge here based on the product passed to addToCart.
+             setCartItems(prevItems => [
+                ...prevItems,
+                {
+                    product_id: updatedItem.product_id,
+                    quantity: updatedItem.quantity,
+                    // Add product details from the 'product' object passed in
+                    name: product.name,
+                    price: product.price,
+                    discount_price: product.discount_price,
+                    image_url: product.image_url,
+                    is_on_sale: product.is_on_sale
+                }
+            ]);
+             // Alternatively, and maybe better: Refetch the whole cart after adding
+             // fetchCart(); // (fetchCart would need to be defined outside useEffect or passed)
+        }
+
+
+        // Optionally show notification or open cart
+        setShowCart(true);
+
+    } catch (error) {
+        console.error("Failed to add item to cart:", error);
+        alert(`Error adding item: ${error.message}`); // Show error to user
+    }
+};
 
     // --- renderCart function remains the same ---
-    const renderCart = () => (
-        <motion.div
-            key="cart-sidebar"
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-xl z-50 flex flex-col"
-            dir="rtl"
-        >
-            <div className="p-4 flex-shrink-0 border-b">
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold">سلة التسوق</h2>
-                    <button onClick={() => setShowCart(false)} className="text-gray-500 hover:text-gray-800">
-                        <X className="h-6 w-6" />
-                    </button>
-                </div>
-            </div>
-            <div className="flex-grow overflow-y-auto p-4 space-y-4">
-                {cart.length === 0 ? (
-                    <p className="text-center text-gray-500">سلة التسوق فارغة.</p>
-                ) : (
-                    cart.map(item => (
-                        <div key={item.id} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
-                            <div
-                                className="h-16 w-16 rounded-lg flex-shrink-0 bg-gray-200"
-                                // Use image_url from cart item (might be different if cart item structure changes)
-                                style={{ background: item.image_url || '#e5e7eb' }}
-                            ></div>
-                            <div className="flex-1 min-w-0">
-                                <h3 className="font-medium truncate">{item.name}</h3>
-                                <div className="text-blue-600">{item.discount_price || item.price} د.إ</div>
-                            </div>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                                <button className="p-1 bg-gray-200 rounded text-gray-700 hover:bg-gray-300">-</button>
-                                <span className="w-6 text-center">{item.quantity}</span>
-                                <button className="p-1 bg-gray-200 rounded text-gray-700 hover:bg-gray-300">+</button>
-                            </div>
-                        </div>
-                    ))
-                )}
-            </div>
-            {cart.length > 0 && (
-                 <div className="p-4 mt-auto border-t flex-shrink-0">
-                    <div className="flex justify-between items-center mb-4">
-                        <span className="font-bold">المجموع:</span>
-                        <span className="font-bold">
-                            {cart.reduce((total, item) => total + (parseFloat(item.discount_price) || parseFloat(item.price)) * item.quantity, 0).toFixed(2)} د.إ {/* Added parseFloat and toFixed */}
-                        </span>
-                    </div>
-                    <button className="w-full bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 transition-colors">
-                        إتمام الشراء
-                    </button>
-                </div>
-            )}
-        </motion.div>
-    );
+      // Inside MainPanel component
+
+  // Placeholder functions for cart actions (implement next)
+  const handleIncreaseQuantity = (productId) => { console.log("Increase qty:", productId); /* TODO */ };
+  const handleDecreaseQuantity = (productId) => { console.log("Decrease qty:", productId); /* TODO */ };
+  const handleRemoveItem = (productId) => { console.log("Remove item:", productId); /* TODO */ };
+
+
+  const renderCart = () => (
+      <motion.div /* ... */ >
+          {/* ... Cart Header ... */}
+
+          <div className="flex-grow overflow-y-auto p-4 space-y-4">
+              {/* --- NEW: Loading/Error for cart --- */}
+              {isLoadingCart && <p className="text-center text-gray-500">جار تحميل السلة...</p>}
+              {cartError && <p className="text-center text-red-500">خطأ في تحميل السلة: {cartError}</p>}
+
+              {!isLoadingCart && !cartError && cartItems.length === 0 && (
+                  <p className="text-center text-gray-500">سلة التسوق فارغة.</p>
+              )}
+
+              {!isLoadingCart && !cartError && cartItems.length > 0 && (
+                  /* --- CHANGE: Map over cartItems --- */
+                  cartItems.map(item => (
+                      <div key={item.product_id} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
+                          <div
+                              className="h-16 w-16 rounded-lg flex-shrink-0 bg-gray-200"
+                              /* --- CHANGE: Use item data --- */
+                              style={{ background: item.image_url || '#e5e7eb' }}
+                          ></div>
+                          <div className="flex-1 min-w-0">
+                              {/* --- CHANGE: Use item data --- */}
+                              <h3 className="font-medium truncate">{item.name}</h3>
+                              {/* --- CHANGE: Logic for price --- */}
+                              <div className="text-blue-600">
+                                  {item.is_on_sale && item.discount_price ? item.discount_price : item.price} د.إ
+                              </div>
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0"> {/* Reduced gap */}
+                              {/* --- NEW: Buttons --- */}
+                              <button
+                                  onClick={() => handleDecreaseQuantity(item.product_id)}
+                                  className="p-1.5 bg-gray-200 rounded text-gray-700 hover:bg-gray-300" aria-label="Decrease quantity">
+                                  <Minus className="h-3 w-3" /> {/* Use icon */}
+                              </button>
+                              <span className="w-6 text-center font-medium">{item.quantity}</span> {/* Fixed width */}
+                               <button
+                                   onClick={() => handleIncreaseQuantity(item.product_id)}
+                                   className="p-1.5 bg-gray-200 rounded text-gray-700 hover:bg-gray-300" aria-label="Increase quantity">
+                                   <Plus className="h-3 w-3" /> {/* Use icon */}
+                               </button>
+                               <button
+                                   onClick={() => handleRemoveItem(item.product_id)}
+                                   className="p-1.5 text-red-500 hover:text-red-700" aria-label="Remove item">
+                                    <Trash2 className="h-4 w-4" /> {/* Use icon */}
+                                </button>
+                          </div>
+                      </div>
+                  ))
+              )}
+          </div>
+
+          {/* Cart Footer - Update total calculation */}
+          {!isLoadingCart && cartItems.length > 0 && (
+               <div className="p-4 mt-auto border-t flex-shrink-0">
+                  <div className="flex justify-between items-center mb-4">
+                      <span className="font-bold">المجموع:</span>
+                      <span className="font-bold">
+                          {/* --- CHANGE: Calculate total from cartItems --- */}
+                          {cartItems.reduce((total, item) => {
+                              const price = item.is_on_sale && item.discount_price ? item.discount_price : item.price;
+                              // Ensure price is treated as a number
+                              return total + (parseFloat(price) * item.quantity);
+                          }, 0).toFixed(2)} د.إ {/* Format to 2 decimal places */}
+                      </span>
+                  </div>
+                  <button className="w-full bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 transition-colors">
+                      إتمام الشراء {/* TODO: Implement checkout logic */}
+                  </button>
+              </div>
+          )}
+      </motion.div>
+  );
 
     return (
         <div className="min-h-screen bg-gray-50" dir="rtl">
