@@ -1,11 +1,12 @@
 // src/App.jsx
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import MainPanel from './components/MainPanel'; // Import your MainPanel component
 
 // Access the Telegram Web App object safely
 const tg = window.Telegram?.WebApp;
 
 function App() {
+  const [telegramUser, setTelegramUser] = useState(null);
 
   useEffect(() => {
     // This code runs once when the app starts
@@ -17,6 +18,7 @@ function App() {
       console.log("InitData Unsafe:", tg.initDataUnsafe);
       if (tg.initDataUnsafe?.user) {
         console.log("User:", tg.initDataUnsafe.user);
+        setTelegramUser(tg.initDataUnsafe.user);
       } else {
         console.log("User data not available within initDataUnsafe.");
       }
@@ -35,7 +37,7 @@ function App() {
 
   // Render the MainPanel component which now handles its own data fetching
   return (
-    <MainPanel />
+    <MainPanel telegramUser={telegramUser} />
   );
 
 }
