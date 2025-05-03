@@ -1,7 +1,7 @@
 // src/components/MainPanel.jsx
 
 import React, { useState, useEffect } from 'react'; // Ensure useEffect is imported
-import { Clock, Plus, Minus, Trash2, MapPin, Star, ShoppingCart, Search, X } from 'lucide-react';
+import { Clock, MapPin, Plus, Minus, Trash2, Star, ShoppingCart, Search, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const MainPanel = ({ telegramUser }) => {
@@ -9,10 +9,43 @@ const MainPanel = ({ telegramUser }) => {
     const [selectedSupplier, setSelectedSupplier] = useState(null);
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [showCart, setShowCart] = useState(false);
-    // --- NEW: State for fetched cart ---
-    const [cartItems, setCartItems] = useState([]);
-    const [isLoadingCart, setIsLoadingCart] = useState(false); // Initially false, load when user is known
-    const [cartError, setCartError] = useState(null);
+   
+     // --- NEW: State for fetched cart ---
+     const [cartItems, setCartItems] = useState([]);
+     const [isLoadingCart, setIsLoadingCart] = useState(false); // Initially false, load when user is known
+     const [cartError, setCartError] = useState(null);
+
+
+
+    // --- State for fetched product data ---
+    const [fetchedProducts, setFetchedProducts] = useState([]); // To store products from API
+    const [isLoadingProducts, setIsLoadingProducts] = useState(true); // Track loading state
+    const [productError, setProductError] = useState(null); // Track fetching errors
+   // --- NEW: State for suppliers ---
+    const [fetchedSuppliers, setFetchedSuppliers] = useState([]);
+    const [isLoadingSuppliers, setIsLoadingSuppliers] = useState(true);
+    const [supplierError, setSupplierError] = useState(null);
+
+    // --- Keep sample data for deals and suppliers for now ---
+    const deals = [
+        {
+            id: 1,
+            title: "عرض خاص على معدات الأسنان",
+            discount: "25%",
+            endDate: "2025-05-01",
+            supplier: "Medical Equipment Co.",
+            image: "linear-gradient(to right, #F59E0B, #D97706)",
+        },
+        {
+            id: 2,
+            title: "صفقة حصرية للمعرض",
+            discount: "30%",
+            endDate: "2025-05-03",
+            supplier: "Dental Supplies Ltd",
+            image: "linear-gradient(to right, #EC4899, #BE185D)",
+        }
+    ];
+
 
     // Inside MainPanel component
 
@@ -49,34 +82,6 @@ useEffect(() => {
     // This effect depends on telegramUser.id, so it runs when the ID becomes available
 }, [telegramUser?.id]); // Dependency array includes user ID
 
-    // --- State for fetched product data ---
-    const [fetchedProducts, setFetchedProducts] = useState([]); // To store products from API
-    const [isLoadingProducts, setIsLoadingProducts] = useState(true); // Track loading state
-    const [productError, setProductError] = useState(null); // Track fetching errors
-   // --- NEW: State for suppliers ---
-    const [fetchedSuppliers, setFetchedSuppliers] = useState([]);
-    const [isLoadingSuppliers, setIsLoadingSuppliers] = useState(true);
-    const [supplierError, setSupplierError] = useState(null);
-
-    // --- Keep sample data for deals and suppliers for now ---
-    const deals = [
-        {
-            id: 1,
-            title: "عرض خاص على معدات الأسنان",
-            discount: "25%",
-            endDate: "2025-05-01",
-            supplier: "Medical Equipment Co.",
-            image: "linear-gradient(to right, #F59E0B, #D97706)",
-        },
-        {
-            id: 2,
-            title: "صفقة حصرية للمعرض",
-            discount: "30%",
-            endDate: "2025-05-03",
-            supplier: "Dental Supplies Ltd",
-            image: "linear-gradient(to right, #EC4899, #BE185D)",
-        }
-    ];
 
     // --- NEW: useEffect to fetch suppliers ---
 useEffect(() => {
@@ -133,7 +138,7 @@ useEffect(() => {
     }, []); // Empty array means run once on component mount
 
 
-     // Inside MainPanel component
+ // Inside MainPanel component
 
  const addToCart = async (product) => {
     if (!telegramUser?.id) {
@@ -297,7 +302,6 @@ useEffect(() => {
           )}
       </motion.div>
   );
-
     return (
         <div className="min-h-screen bg-gray-50" dir="rtl">
             {/* Header */}
@@ -310,9 +314,9 @@ useEffect(() => {
                             className="relative p-2 text-gray-600 hover:text-blue-600"
                         >
                             <ShoppingCart className="h-6 w-6" />
-                            {cart.length > 0 && (
+                            {cartItems.length > 0 && (
                                 <span className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">
-                                    {cart.reduce((acc, item) => acc + item.quantity, 0)}
+                                    {cartItems.reduce((acc, item) => acc + item.quantity, 0)}
                                 </span>
                             )}
                         </button>

@@ -6,6 +6,7 @@ import MainPanel from './components/MainPanel'; // Import your MainPanel compone
 const tg = window.Telegram?.WebApp;
 
 function App() {
+
   const [telegramUser, setTelegramUser] = useState(null);
 
   useEffect(() => {
