@@ -26,6 +26,23 @@ const MainPanel = ({ telegramUser }) => {
     const [isLoadingSuppliers, setIsLoadingSuppliers] = useState(true);
     const [supplierError, setSupplierError] = useState(null);
 
+    // --- NEW: State for Profile and Checkout Flow ---
+    const [userProfile, setUserProfile] = useState(null); // Store fetched profile data
+    const [isLoadingProfile, setIsLoadingProfile] = useState(false);
+    const [profileError, setProfileError] = useState(null);
+    const [showAddressModal, setShowAddressModal] = useState(false);
+    const [isPlacingOrder, setIsPlacingOrder] = useState(false); // For "Proceed to Checkout" button loading
+
+    // Address Form State (inside MainPanel or a new AddressFormModal component)
+    const [addressFormData, setAddressFormData] = useState({
+        fullName: '',
+        phoneNumber: '',
+        addressLine1: '',
+        addressLine2: '',
+        city: '',
+    });
+
+
     // --- Keep sample data for deals and suppliers for now ---
     const deals = [
         {
@@ -137,6 +154,21 @@ useEffect(() => {
         fetchProducts(); // Run the fetch function
     }, []); // Empty array means run once on component mount
 
+// Inside MainPanel component
+
+
+
+// Inside MainPanel component
+const handleAddressFormChange = (e) => {
+    const { name, value } = e.target;
+    setAddressFormData(prev => ({ ...prev, [name]: value }));
+};
+
+// Inside MainPanel component
+
+
+// Inside MainPanel component
+
 
  // Inside MainPanel component
 
@@ -226,6 +258,146 @@ useEffect(() => {
   const handleDecreaseQuantity = (productId) => { console.log("Decrease qty:", productId); /* TODO */ };
   const handleRemoveItem = (productId) => { console.log("Remove item:", productId); /* TODO */ };
 
+  const handleCheckout = async () => {
+    if (!telegramUser?.id) {
+        alert("User information not available. Please try again.");
+        return;
+    }
+    if (cartItems.length === 0) {
+        alert("Your cart is empty.");
+        return;
+    }
+
+    setIsLoadingProfile(true); // Show loading indicator for profile check
+    setProfileError(null);
+    setShowAddressModal(false); // Ensure modal is hidden initially
+
+    try {
+        const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/user/profile?userId=${telegramUser.id}`;
+        const response = await fetch(apiUrl);
+
+        if (response.ok) { // Profile exists
+            const profileData = await response.json();
+            setUserProfile(profileData);
+            // Pre-fill address form state if needed, though maybe not necessary if just proceeding
+            setAddressFormData({
+                fullName: profileData.full_name || '',
+                phoneNumber: profileData.phone_number || '',
+                addressLine1: profileData.address_line1 || '',
+                addressLine2: profileData.address_line2 || '',
+                city: profileData.city || '',
+            });
+            console.log("Profile found:", profileData);
+            await proceedToCreateOrder(); // Directly proceed to order creation
+        } else if (response.status === 404) { // Profile not found
+            console.log("Profile not found, showing address modal.");
+            // Pre-fill with Telegram user's first/last name if available
+            setAddressFormData(prev => ({
+                ...prev,
+                fullName: `${telegramUser.first_name || ''} ${telegramUser.last_name || ''}`.trim()
+            }));
+            setShowAddressModal(true);
+        } else { // Other error
+            throw new Error(`Failed to fetch profile: ${response.status}`);
+        }
+    } catch (error) {
+        console.error("Error during profile check:", error);
+        setProfileError(error.message);
+        alert(`Error checking your profile: ${error.message}`);
+    } finally {
+        setIsLoadingProfile(false);
+    }
+};
+
+const handleSaveProfile = async (e) => {
+    e.preventDefault(); // Prevent default form submission
+    if (!telegramUser?.id) {
+        alert("User information not available.");
+        return;
+    }
+
+    // Add specific loading state for profile save if 'isPlacingOrder' feels wrong
+    setIsPlacingOrder(true); // Or use setIsLoadingProfile if more appropriate
+    setProfileError(null); // Clear previous errors
+
+    try {
+        const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/user/profile`;
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userId: telegramUser.id,
+                ...addressFormData // Send all form data
+            }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: "Failed to save profile." }));
+            throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        }
+
+        const savedProfile = await response.json();
+        setUserProfile(savedProfile); // Update local profile state
+        setShowAddressModal(false); // Hide modal on success
+        console.log("Profile saved:", savedProfile);
+
+        // Now that profile is saved, proceed to create the order
+        await proceedToCreateOrder();
+
+    } catch (error) {
+        console.error("Error saving profile:", error);
+        setProfileError(error.message); // Show error in the modal
+        // alert(`Error saving profile: ${error.message}`); // Or use an alert
+    } finally {
+        setIsPlacingOrder(false); // Or setIsLoadingProfile(false)
+    }
+};
+
+const proceedToCreateOrder = async () => {
+    if (!telegramUser?.id) {
+        alert("Cannot create order: User information missing.");
+        return;
+    }
+    if (cartItems.length === 0) {
+        alert("Cannot create order: Your cart is empty.");
+        return;
+    }
+
+    setIsPlacingOrder(true);
+    // Consider clearing profileError here if it's shared with the modal
+    // setProfileError(null);
+
+    try {
+        const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/orders`;
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: telegramUser.id }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: "Failed to create order." }));
+            throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        }
+
+        const orderResult = await response.json();
+        console.log("Order created:", orderResult);
+
+        alert(`تم إنشاء طلبك بنجاح! رقم الطلب: ${orderResult.orderId}. سنتواصل معك قريباً.`); // Success message
+        setCartItems([]); // Clear the cart on the frontend
+        // Optionally, close the Mini App or navigate to a success page
+        // if (window.Telegram?.WebApp) {
+        //     window.Telegram.WebApp.close();
+        // }
+
+    } catch (error) {
+        console.error("Error creating order:", error);
+        alert(`فشل في إنشاء الطلب: ${error.message}`);
+    } finally {
+        setIsPlacingOrder(false);
+    }
+};
+
 
   const renderCart = () => (
       <motion.div /* ... */ >
@@ -295,9 +467,13 @@ useEffect(() => {
                           }, 0).toFixed(2)} د.إ {/* Format to 2 decimal places */}
                       </span>
                   </div>
-                  <button className="w-full bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 transition-colors">
-                      إتمام الشراء {/* TODO: Implement checkout logic */}
-                  </button>
+                  <button
+    onClick={handleCheckout} // Attach the handler
+    disabled={isLoadingProfile || isPlacingOrder || cartItems.length === 0} // Disable if loading or cart empty
+    className="w-full bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
+>
+    {isLoadingProfile ? "جار التحقق..." : isPlacingOrder ? "جار إنشاء الطلب..." : "إتمام الشراء"}
+</button>
               </div>
           )}
       </motion.div>
@@ -524,6 +700,98 @@ useEffect(() => {
             <AnimatePresence>
                 {showCart && renderCart()}
             </AnimatePresence>
+            // Inside MainPanel component's return statement, perhaps after the cart sidebar's AnimatePresence
+
+{showAddressModal && (
+    <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+        dir="rtl" // For RTL layout
+    >
+        <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
+            <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold">تفاصيل التوصيل</h2>
+                <button onClick={() => setShowAddressModal(false)} className="text-gray-500 hover:text-gray-800">
+                    <X className="h-6 w-6" />
+                </button>
+            </div>
+
+            {/* Display profileError specific to modal actions if any */}
+            {profileError && <p className="text-red-500 text-sm mb-3">{profileError}</p>}
+
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+                <div>
+                    <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-1">الاسم الكامل</label>
+                    <input
+                        type="text"
+                        name="fullName"
+                        id="fullName"
+                        required
+                        value={addressFormData.fullName}
+                        onChange={handleAddressFormChange}
+                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    />
+                </div>
+                <div>
+                    <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700 mb-1">رقم الهاتف</label>
+                    <input
+                        type="tel"
+                        name="phoneNumber"
+                        id="phoneNumber"
+                        required
+                        value={addressFormData.phoneNumber}
+                        onChange={handleAddressFormChange}
+                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    />
+                </div>
+                <div>
+                    <label htmlFor="addressLine1" className="block text-sm font-medium text-gray-700 mb-1">العنوان (سطر ١)</label>
+                    <input
+                        type="text"
+                        name="addressLine1"
+                        id="addressLine1"
+                        required
+                        value={addressFormData.addressLine1}
+                        onChange={handleAddressFormChange}
+                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    />
+                </div>
+                <div>
+                    <label htmlFor="addressLine2" className="block text-sm font-medium text-gray-700 mb-1">العنوان (سطر ٢) (اختياري)</label>
+                    <input
+                        type="text"
+                        name="addressLine2"
+                        id="addressLine2"
+                        value={addressFormData.addressLine2}
+                        onChange={handleAddressFormChange}
+                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    />
+                </div>
+                <div>
+                    <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">المدينة</label>
+                    <input
+                        type="text"
+                        name="city"
+                        id="city"
+                        required
+                        value={addressFormData.city}
+                        onChange={handleAddressFormChange}
+                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    />
+                </div>
+                <button
+                    type="submit"
+                    disabled={isPlacingOrder || isLoadingProfile} // Use existing loading states or add a new one for profile save
+                    className="w-full bg-green-500 text-white py-2.5 rounded-md hover:bg-green-600 transition-colors disabled:opacity-50"
+                >
+                    {isPlacingOrder ? "جار الحفظ..." : "حفظ ومتابعة"}
+                </button>
+            </form>
+        </div>
+    </motion.div>
+)}
 
         </div>
     );
