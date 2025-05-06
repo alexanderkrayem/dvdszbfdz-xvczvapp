@@ -700,8 +700,7 @@ const proceedToCreateOrder = async () => {
             <AnimatePresence>
                 {showCart && renderCart()}
             </AnimatePresence>
-            // Inside MainPanel component's return statement, perhaps after the cart sidebar's AnimatePresence
-
+            
 {showAddressModal && (
     <motion.div
         initial={{ opacity: 0 }}
