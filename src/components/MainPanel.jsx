@@ -64,20 +64,14 @@ const MainPanel = ({ telegramUser }) => {
     ];
 
 
-    // Inside MainPanel component
-
-// --- NEW: useEffect to fetch cart ---
-useEffect(() => {
-    // Only fetch if we have a user ID
-    if (!telegramUser?.id) {
-        // console.log("Waiting for user info to fetch cart...");
-        return; // Exit if no user ID yet
-    }
-
-    const fetchCart = async () => {
+    const doFetchCart = async () => { // Renamed to avoid conflict if it's a prop/state
+        if (!telegramUser?.id) {
+            console.log("User info not available for fetching cart.");
+            // Potentially set cart loading false and clear items if user becomes null
+            return;
+        }
         setIsLoadingCart(true);
         setCartError(null);
-        console.log(`Fetching cart for user: ${telegramUser.id}`);
         try {
             const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/cart?userId=${telegramUser.id}`;
             const response = await fetch(apiUrl);
@@ -85,19 +79,17 @@ useEffect(() => {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             const data = await response.json();
-            console.log("Cart data received:", data);
             setCartItems(data);
         } catch (error) {
             console.error("Failed to fetch cart:", error);
             setCartError(error.message);
+            setCartItems([]); // Clear cart on error
         } finally {
             setIsLoadingCart(false);
         }
     };
-
-    fetchCart();
-    // This effect depends on telegramUser.id, so it runs when the ID becomes available
-}, [telegramUser?.id]); // Dependency array includes user ID
+    
+    // Inside MainPanel component
 
 
     // --- NEW: useEffect to fetch suppliers ---
@@ -157,6 +149,18 @@ useEffect(() => {
 // Inside MainPanel component
 
 
+// --- NEW: useEffect to fetch cart ---
+useEffect(() => {
+    if (telegramUser?.id) {
+        console.log("useEffect for cart triggered due to telegramUser.id change/presence.");
+        doFetchCart(); // << CALLS THE FUNCTION ABOVE
+    } else {
+        setCartItems([]);
+        setIsLoadingCart(false);
+    }
+    // The 'const fetchCart = async () => {...}' block that was previously
+    // defined INSIDE this useEffect should be REMOVED.
+}, [telegramUser?.id]);
 
 // Inside MainPanel component
 const handleAddressFormChange = (e) => {
@@ -169,21 +173,27 @@ const handleAddressFormChange = (e) => {
 
 // Inside MainPanel component
 
+// Inside MainPanel component, before other handler functions
+
+
 
  // Inside MainPanel component
 
  const addToCart = async (product) => {
     if (!telegramUser?.id) {
-        alert("Cannot add to cart: User information not loaded."); // Or handle more gracefully
+        alert("Cannot add to cart: User information not loaded.");
         return;
     }
     if (!product?.id) {
         console.error("Cannot add to cart: Invalid product data", product);
+        alert("Error: Could not add product to cart due to invalid product data."); // User-facing feedback
         return;
     }
 
-    console.log(`Adding product ${product.id} to cart for user ${telegramUser.id}`);
-    // Consider adding loading state for the specific button maybe?
+    console.log(`Adding product ${product.id} (${product.name}) to cart for user ${telegramUser.id}`);
+    // You could add a specific loading state for this action if you want,
+    // e.g., by disabling the button or showing a spinner.
+    // For now, the general cart loading state from doFetchCart will cover the refresh.
 
     try {
         const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/cart`;
@@ -195,68 +205,132 @@ const handleAddressFormChange = (e) => {
             body: JSON.stringify({
                 userId: telegramUser.id,
                 productId: product.id,
-                quantity: 1 // Send quantity 1 to add/increment by 1
+                quantity: 1 // Your backend POST adds this quantity
             }),
         });
 
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const updatedItem = await response.json();
-        console.log("Item added/updated:", updatedItem);
-
-        // --- Update frontend state ---
-        // Find if item already exists in local state
-        const existingItemIndex = cartItems.findIndex(item => item.product_id === updatedItem.product_id);
-
-        if (existingItemIndex > -1) {
-            // Item exists, update its quantity
-            const newCartItems = [...cartItems];
-            newCartItems[existingItemIndex] = {
-                ...newCartItems[existingItemIndex], // Keep existing product details
-                 quantity: updatedItem.quantity // Update quantity from backend response
-            };
-             setCartItems(newCartItems);
-        } else {
-            // Item is new, add it (need to merge product details from original product)
-            // The backend currently only returns the cart_item row.
-            // We either need the backend GET /cart to return full product details
-            // OR we merge here based on the product passed to addToCart.
-             setCartItems(prevItems => [
-                ...prevItems,
-                {
-                    product_id: updatedItem.product_id,
-                    quantity: updatedItem.quantity,
-                    // Add product details from the 'product' object passed in
-                    name: product.name,
-                    price: product.price,
-                    discount_price: product.discount_price,
-                    image_url: product.image_url,
-                    is_on_sale: product.is_on_sale
+            // Try to get more specific error message from backend if possible
+            let errorMsg = `HTTP error! status: ${response.status}`;
+            try {
+                const errorData = await response.json();
+                if (errorData && errorData.error) {
+                    errorMsg = errorData.error;
                 }
-            ]);
-             // Alternatively, and maybe better: Refetch the whole cart after adding
-             // fetchCart(); // (fetchCart would need to be defined outside useEffect or passed)
+            } catch (e) {
+                // Ignore if response body isn't JSON or is empty
+            }
+            throw new Error(errorMsg);
         }
 
+        // No need to parse updatedItem if we are refetching the whole cart
+        // const updatedItem = await response.json();
+        // console.log("Item added/updated via POST:", updatedItem);
 
-        // Optionally show notification or open cart
-        setShowCart(true);
+        // --- IMPORTANT: Refetch the entire cart to ensure UI consistency ---
+        await doFetchCart();
+
+        // Optionally show notification or open cart after successful addition
+        setShowCart(true); // Open the cart sidebar
+        // You could also add a small success toast/notification here
 
     } catch (error) {
         console.error("Failed to add item to cart:", error);
-        alert(`Error adding item: ${error.message}`); // Show error to user
+        alert(`Error adding item to cart: ${error.message}`); // Show error to user
+    } finally {
+        // Reset any specific "adding to cart" loading state here if you implemented one
     }
 };
+
 
     // --- renderCart function remains the same ---
       // Inside MainPanel component
 
-  // Placeholder functions for cart actions (implement next)
-  const handleIncreaseQuantity = (productId) => { console.log("Increase qty:", productId); /* TODO */ };
-  const handleDecreaseQuantity = (productId) => { console.log("Decrease qty:", productId); /* TODO */ };
-  const handleRemoveItem = (productId) => { console.log("Remove item:", productId); /* TODO */ };
+  // Inside MainPanel component
+
+// Function to handle increasing quantity (or adding if not present)
+const handleIncreaseQuantity = async (productId) => {
+    if (!telegramUser?.id) return;
+
+    // Find the item in the current cart to get its current quantity
+    const itemInCart = cartItems.find(item => item.product_id === productId);
+    const currentQuantity = itemInCart ? itemInCart.quantity : 0;
+
+    // If using POST to increment (as in original addToCart)
+    // This assumes POST /api/cart with quantity:1 always means "add one more"
+    // or creates the item with quantity 1 if not existing.
+    // If POST always SETS quantity, then this logic changes.
+    // Our current POST with ON CONFLICT adds the provided quantity.
+    console.log(`Increasing quantity for product ${productId} (current: ${currentQuantity})`);
+    try {
+        const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/cart`;
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userId: telegramUser.id,
+                productId: productId,
+                quantity: 1 // Always add 1
+            }),
+        });
+        if (!response.ok) throw new Error(`Failed to increase quantity: ${response.statusText}`);
+        await doFetchCart(); // Refetch cart to update UI
+    } catch (error) {
+        console.error("Error increasing quantity:", error);
+        alert(`Error: ${error.message}`);
+    }
+};
+
+// Function to handle decreasing quantity
+const handleDecreaseQuantity = async (productId) => {
+    if (!telegramUser?.id) return;
+
+    const itemInCart = cartItems.find(item => item.product_id === productId);
+    if (!itemInCart) {
+        console.warn("Attempted to decrease quantity of item not in cart.");
+        return;
+    }
+
+    console.log(`Decreasing quantity for product ${productId} (current: ${itemInCart.quantity})`);
+
+    if (itemInCart.quantity <= 1) {
+        // If quantity is 1 or less, remove the item
+        await handleRemoveItem(productId);
+    } else {
+        // Decrease quantity by 1 using the PUT endpoint
+        try {
+            const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/cart/item/${productId}?userId=${telegramUser.id}`;
+            const response = await fetch(apiUrl, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ newQuantity: itemInCart.quantity - 1 }),
+            });
+            if (!response.ok) throw new Error(`Failed to decrease quantity: ${response.statusText}`);
+            await doFetchCart(); // Refetch cart
+        } catch (error) {
+            console.error("Error decreasing quantity:", error);
+            alert(`Error: ${error.message}`);
+        }
+    }
+};
+
+// Function to handle removing an item completely
+const handleRemoveItem = async (productId) => {
+    if (!telegramUser?.id) return;
+
+    console.log(`Removing product ${productId} from cart`);
+    try {
+        const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/cart/item/${productId}?userId=${telegramUser.id}`;
+        const response = await fetch(apiUrl, {
+            method: 'DELETE',
+        });
+        if (!response.ok) throw new Error(`Failed to remove item: ${response.statusText}`);
+        await doFetchCart(); // Refetch cart
+    } catch (error) {
+        console.error("Error removing item:", error);
+        alert(`Error: ${error.message}`);
+    }
+};
 
   const handleCheckout = async () => {
     if (!telegramUser?.id) {
