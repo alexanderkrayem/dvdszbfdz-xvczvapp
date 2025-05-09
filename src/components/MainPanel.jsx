@@ -474,8 +474,31 @@ const proceedToCreateOrder = async () => {
 
 
   const renderCart = () => (
-      <motion.div /* ... */ >
+      <motion.div
+      key="cart-sidebar"
+      initial={{ x: '100%' }} // Assuming RTL, slides from right
+      animate={{ x: 0 }}
+      exit={{ x: '100%' }} // Assuming RTL, slides to right
+      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+      className="fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-xl z-50 flex flex-col"
+      // dir="rtl" is usually set on a higher parent, but explicitly here is fine too
+      // For LTR, you'd use 'left-0' and initial/exit x: '-100%'
+      >
           {/* ... Cart Header ... */}
+          {/* --- NEW: Cart Header with Title and Close Button --- */}
+        <div className="p-4 flex-shrink-0 border-b bg-gray-50"> {/* Added a subtle background to header */}
+            <div className="flex justify-between items-center"> {/* Removed mb-4 as padding is on parent */}
+                <h2 className="text-xl font-semibold text-gray-800">سلة التسوق</h2> {/* Adjusted font weight */}
+                <button
+                    onClick={() => setShowCart(false)} // <<< THIS IS THE CRUCIAL PART
+                    className="text-gray-500 hover:text-gray-700 p-2 rounded-full hover:bg-gray-200 transition-colors" // Added p-2 for better click area
+                    aria-label="Close cart"
+                >
+                    <X className="h-5 w-5" /> {/* Adjusted icon size slightly */}
+                </button>
+            </div>
+        </div>
+        {/* --- END OF NEW Cart Header --- */}
 
           <div className="flex-grow overflow-y-auto p-4 space-y-4">
               {/* --- NEW: Loading/Error for cart --- */}
@@ -552,6 +575,45 @@ const proceedToCreateOrder = async () => {
           )}
       </motion.div>
   );
+
+  // --- NEW: Function to render the Mini Cart Summary Bar ---
+const renderMiniCartBar = () => {
+    if (isLoadingCart || cartItems.length === 0 || showCart) { // Don't show if loading, empty, or full cart is open
+        return null;
+    }
+
+    const totalCartPrice = cartItems.reduce((total, item) => {
+        const price = item.is_on_sale && item.discount_price ? item.discount_price : item.price;
+        return total + (parseFloat(price) * item.quantity);
+    }, 0).toFixed(2);
+
+    const totalCartItems = cartItems.reduce((acc, item) => acc + item.quantity, 0);
+
+    return (
+        <motion.div
+            initial={{ y: 100 }} // Start off-screen
+            animate={{ y: 0 }}   // Animate to on-screen
+            exit={{ y: 100 }}     // Animate off-screen
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            className="fixed bottom-0 left-0 right-0 bg-white shadow-top-md p-3 z-40" // shadow-top-md is a custom class you might need to define or use existing shadow
+            dir="rtl"
+        >
+            <div className="max-w-4xl mx-auto flex justify-between items-center">
+                <div>
+                    <span className="font-semibold">{totalCartItems} عنصر</span>
+                    <span className="mx-2">|</span>
+                    <span className="font-bold text-blue-600">{totalCartPrice} د.إ</span>
+                </div>
+                <button
+                    onClick={() => setShowCart(true)} // This opens the full cart sidebar
+                    className="bg-blue-500 text-white px-5 py-2 rounded-lg hover:bg-blue-600 text-sm"
+                >
+                    عرض السلة
+                </button>
+            </div>
+        </motion.div>
+    );
+};
     return (
         <div className="min-h-screen bg-gray-50" dir="rtl">
             {/* Header */}
@@ -600,7 +662,7 @@ const proceedToCreateOrder = async () => {
             </div>
 
             {/* Main Content */}
-            <div className="p-4 max-w-4xl mx-auto">
+            <div className="p-4 max-w-4xl mx-auto pb-24">
                 {/* Deals Section (Still uses sample data) */}
                 {activeSection === 'exhibitions' && (
                     <div className="space-y-4">
@@ -769,6 +831,12 @@ const proceedToCreateOrder = async () => {
                     </div>
                 )}
             </div>
+
+{/* Section 3: Mini Cart Summary Bar (NEW) */}
+<AnimatePresence>
+            {/* This will call the renderMiniCartBar() function defined above */}
+            {renderMiniCartBar()}
+        </AnimatePresence>
 
             {/* Cart Sidebar */}
             <AnimatePresence>
