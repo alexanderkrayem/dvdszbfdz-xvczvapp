@@ -1,7 +1,7 @@
 // src/components/MainPanel.jsx
 
 import React, { useState, useEffect } from 'react'; // Ensure useEffect is imported
-import { Clock, MapPin, Plus, Minus, Trash2, Star, ShoppingCart, Search, X } from 'lucide-react';
+import { Clock, MapPin, Plus, Minus, Trash2, Star, ShoppingCart, Search, X, Heart } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const MainPanel = ({ telegramUser }) => {
@@ -32,6 +32,10 @@ const MainPanel = ({ telegramUser }) => {
     const [profileError, setProfileError] = useState(null);
     const [showAddressModal, setShowAddressModal] = useState(false);
     const [isPlacingOrder, setIsPlacingOrder] = useState(false); // For "Proceed to Checkout" button loading
+
+// Inside MainPanel component
+const [userFavoriteProductIds, setUserFavoriteProductIds] = useState(new Set()); // Use a Set for efficient lookups
+const [isLoadingFavorites, setIsLoadingFavorites] = useState(false);
 
     // Address Form State (inside MainPanel or a new AddressFormModal component)
     const [addressFormData, setAddressFormData] = useState({
@@ -90,7 +94,29 @@ const MainPanel = ({ telegramUser }) => {
     };
     
     // Inside MainPanel component
+// Inside MainPanel component
 
+useEffect(() => {
+    const fetchUserFavorites = async () => {
+        if (!telegramUser?.id) return;
+
+        setIsLoadingFavorites(true);
+        try {
+            const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/favorites?userId=${telegramUser.id}`;
+            const response = await fetch(apiUrl);
+            if (!response.ok) throw new Error('Failed to fetch favorites');
+            const favoriteIds = await response.json(); // Expecting an array of product_ids
+            setUserFavoriteProductIds(new Set(favoriteIds)); // Store as a Set
+        } catch (error) {
+            console.error("Error fetching user favorites:", error);
+            // Don't necessarily need to show error to user, can silently fail for this
+        } finally {
+            setIsLoadingFavorites(false);
+        }
+    };
+
+    fetchUserFavorites();
+}, [telegramUser?.id]); // Re-fetch if user changes
 
     // --- NEW: useEffect to fetch suppliers ---
 useEffect(() => {
@@ -239,6 +265,49 @@ const handleAddressFormChange = (e) => {
         alert(`Error adding item to cart: ${error.message}`); // Show error to user
     } finally {
         // Reset any specific "adding to cart" loading state here if you implemented one
+    }
+};
+
+// Inside MainPanel component
+
+const handleToggleFavorite = async (productId) => {
+    if (!telegramUser?.id || isLoadingFavorites) return; // Prevent action if no user or still loading initial favs
+
+    const isCurrentlyFavorite = userFavoriteProductIds.has(productId);
+    const method = isCurrentlyFavorite ? 'DELETE' : 'POST';
+    // For DELETE, productId is in path; for POST, it's in body
+    const apiUrl = isCurrentlyFavorite
+        ? `${import.meta.env.VITE_API_BASE_URL}/api/favorites/${productId}?userId=${telegramUser.id}`
+        : `${import.meta.env.VITE_API_BASE_URL}/api/favorites`;
+
+    // Optimistically update UI first for better responsiveness
+    const newFavoriteProductIds = new Set(userFavoriteProductIds);
+    if (isCurrentlyFavorite) {
+        newFavoriteProductIds.delete(productId);
+    } else {
+        newFavoriteProductIds.add(productId);
+    }
+    setUserFavoriteProductIds(newFavoriteProductIds);
+
+    try {
+        const body = method === 'POST' ? JSON.stringify({ userId: telegramUser.id, productId }) : null;
+        const headers = method === 'POST' ? { 'Content-Type': 'application/json' } : {};
+
+        const response = await fetch(apiUrl, { method, headers, body });
+
+        if (!response.ok) {
+            // Revert optimistic update on error
+            setUserFavoriteProductIds(new Set(userFavoriteProductIds)); // Revert to original
+            throw new Error(`Failed to ${isCurrentlyFavorite ? 'remove' : 'add'} favorite`);
+        }
+        // Backend confirmed, UI is already updated. Could log success.
+        console.log(`Product ${productId} ${isCurrentlyFavorite ? 'removed from' : 'added to'} favorites successfully.`);
+
+    } catch (error) {
+        console.error("Error toggling favorite:", error);
+        // Revert optimistic update on error
+        setUserFavoriteProductIds(new Set(userFavoriteProductIds)); // Revert to original
+        alert(`Error: ${error.message}`);
     }
 };
 
@@ -730,6 +799,27 @@ const renderMiniCartBar = () => {
                                                     تخفيض
                                                 </div>
                                             )}
+                                             {/* --- FAVORITE BUTTON --- */}
+        <button
+            onClick={(e) => {
+                e.stopPropagation(); // Prevent card click (which opens product detail) when heart is clicked
+                handleToggleFavorite(product.id);
+            }}
+            // For RTL, top-right is usually the spot. Adjust if needed.
+            className="absolute top-2 right-2 p-1.5 bg-white/80 hover:bg-white rounded-full shadow-md transition-colors z-10" // Tailwind classes for styling
+            aria-label={userFavoriteProductIds.has(product.id) ? "Remove from favorites" : "Add to favorites"}
+        >
+            <Heart
+                className={`h-5 w-5 transition-all duration-150 ${
+                    userFavoriteProductIds.has(product.id)
+                        ? 'text-red-500 fill-red-500' // Favorited state
+                        : 'text-gray-400 hover:text-red-400' // Not favorited state
+                }`}
+                // Optional: Add strokeWidth if you want a thicker/thinner outline
+                // strokeWidth={userFavoriteProductIds.has(product.id) ? 2.5 : 2}
+            />
+        </button>
+        {/* End of Favorite Button */}
                                         </div>
                                         <div className="p-3 flex flex-col flex-grow">
                                             <h3 className="font-semibold text-sm mb-2 text-gray-800 flex-grow">{product.name}</h3>
