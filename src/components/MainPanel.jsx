@@ -782,7 +782,7 @@ const renderMiniCartBar = () => {
                                 {fetchedProducts.map(product => (
                                     <motion.div
                                         key={product.id} // Use ID from fetched data
-                                        className="bg-white rounded-xl shadow-md overflow-hidden cursor-pointer flex flex-col"
+                                        className="bg-white rounded-xl shadow-md overflow-hidden cursor-pointer flex flex-col relative z-0"
                                         whileHover={{ y: -5, boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)' }}
                                         onClick={() => setSelectedProduct(product)}
                                     >
