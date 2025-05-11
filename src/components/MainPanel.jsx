@@ -19,8 +19,16 @@ const MainPanel = ({ telegramUser }) => {
 
     // --- State for fetched product data ---
     const [fetchedProducts, setFetchedProducts] = useState([]); // To store products from API
-    const [isLoadingProducts, setIsLoadingProducts] = useState(true); // Track loading state
+    const [isLoadingProducts, setIsLoadingProducts] = useState(false); // Track loading state
     const [productError, setProductError] = useState(null); // Track fetching errors
+
+
+    // --- NEW: Pagination state for products ---
+const [currentProductPage, setCurrentProductPage] = useState(1);
+const [totalProductPages, setTotalProductPages] = useState(1);
+const [isLoadingMoreProducts, setIsLoadingMoreProducts] = useState(false); // Specific loading for "load more"
+const PRODUCTS_PER_PAGE = 12; // Or 20, or whatever you prefer as a default limit
+
    // --- NEW: State for suppliers ---
     const [fetchedSuppliers, setFetchedSuppliers] = useState([]);
     const [isLoadingSuppliers, setIsLoadingSuppliers] = useState(true);
@@ -96,6 +104,44 @@ const [isLoadingFavorites, setIsLoadingFavorites] = useState(false);
     // Inside MainPanel component
 // Inside MainPanel component
 
+// Inside MainPanel component
+
+const handleLoadMoreProducts = async () => {
+    if (isLoadingMoreProducts || currentProductPage >= totalProductPages) {
+        return; // Don't fetch if already loading or no more pages
+    }
+
+    setIsLoadingMoreProducts(true);
+    setProductError(null); // Clear previous errors
+
+    const nextPage = currentProductPage + 1;
+
+    try {
+        const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/products?page=${nextPage}&limit=${PRODUCTS_PER_PAGE}`;
+        // TODO LATER: Add searchTerm and category params here too, consistent with initial fetch
+
+        console.log("Loading more products from:", apiUrl);
+        const response = await fetch(apiUrl);
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+
+        // --- Append new products to the existing list ---
+        setFetchedProducts(prevProducts => [...prevProducts, ...data.items]);
+        setCurrentProductPage(data.currentPage);
+        // totalProductPages should remain the same, but good to update if backend recalculates
+        setTotalProductPages(data.totalPages);
+
+    } catch (error) {
+        console.error("Failed to load more products:", error);
+        setProductError(error.message); // You might want a separate error state for "load more"
+    } finally {
+        setIsLoadingMoreProducts(false);
+    }
+};
+
 useEffect(() => {
     const fetchUserFavorites = async () => {
         if (!telegramUser?.id) return;
@@ -147,21 +193,29 @@ useEffect(() => {
 
     // --- useEffect to fetch products from the backend ---
     useEffect(() => {
-        const fetchProducts = async () => {
+        const fetchInitialProducts = async () => {
           setIsLoadingProducts(true);
           setProductError(null);
+          // Reset products when fetching initial (e.g. if filters change later)
+        setFetchedProducts([]);
+        setCurrentProductPage(1); // Always start at page 1 for initial load
           try {
               // Ensure your backend server (telegram-app-backend) is running on localhost:3001
               const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
-              const apiUrl = `${apiBaseUrl}/api/products`;
-              console.log("Attempting to fetch products from:", apiUrl);
+              const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/products?page=1&limit=${PRODUCTS_PER_PAGE}`;
+            // TODO LATER: Add searchTerm and category params here when search/filter UI is built
+            // e.g., &searchTerm=${currentSearchTerm}&category=${currentCategory}
+            console.log("Fetching initial products from:", apiUrl);
+        
               const response = await fetch(apiUrl);
               
               if (!response.ok) {
                   throw new Error(`HTTP error! status: ${response.status}`);
               }
               const data = await response.json();
-              setFetchedProducts(data); // Update state with fetched products
+              setFetchedProducts(data.items); // Update state with fetched products
+              setCurrentProductPage(data.currentPage);
+            setTotalProductPages(data.totalPages);
           } catch (error) {
               console.error("Failed to fetch products:", error);
               setProductError(error.message); // Set error state
@@ -169,7 +223,7 @@ useEffect(() => {
               setIsLoadingProducts(false); // Set loading false when done
           }
         };
-        fetchProducts(); // Run the fetch function
+        fetchInitialProducts(); // Run the fetch function
     }, []); // Empty array means run once on component mount
 
 // Inside MainPanel component
@@ -765,99 +819,134 @@ const renderMiniCartBar = () => {
                     </div>
                 )}
 
-                {/* --- UPDATED Products Section --- */}
-                {activeSection === 'products' && (
-                    <div className="space-y-4">
-                        <h2 className="text-xl font-bold mb-4 text-gray-800">المنتجات المعروضة</h2>
+{activeSection === 'products' && (
+    <div className="space-y-4"> {/* Outer container for this section */}
+        <h2 className="text-xl font-bold mb-4 text-gray-800">المنتجات المعروضة</h2>
 
-                        {/* Loading State */}
-                        {isLoadingProducts && <p className="text-center text-gray-500 py-10">جار تحميل المنتجات...</p>}
+        {/* 1. Main Loading State (for initial load or when filters change) */}
+        {isLoadingProducts && (
+            <div className="flex justify-center items-center h-40">
+                <p className="text-gray-500">جار تحميل المنتجات...</p>
+                {/* You could put a spinner icon here */}
+            </div>
+        )}
 
-                        {/* Error State */}
-                        {productError && <p className="text-center text-red-500 py-10">خطأ في تحميل المنتجات: {productError}</p>}
+        {/* 2. Error State (for initial load or filter change errors) */}
+        {productError && !isLoadingProducts && ( // Show error only if not also loading
+            <div className="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg text-center" role="alert">
+                <span className="font-medium">خطأ!</span> لا يمكن تحميل المنتجات حالياً.
+                <p className="text-xs mt-1">{productError === 'Failed to fetch' ? 'الرجاء التحقق من اتصالك بالإنترنت.' : productError}</p>
+            </div>
+        )}
 
-                        {/* Success State - Grid of Products */}
-                        {!isLoadingProducts && !productError && fetchedProducts.length > 0 && (
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                                {fetchedProducts.map(product => (
-                                    <motion.div
-                                        key={product.id} // Use ID from fetched data
-                                        className="bg-white rounded-xl shadow-md overflow-hidden cursor-pointer flex flex-col relative z-0"
-                                        whileHover={{ y: -5, boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)' }}
-                                        onClick={() => setSelectedProduct(product)}
-                                    >
-                                        <div
-                                            className="h-32 w-full flex items-center justify-center text-white relative bg-gray-200"
-                                            // Use image_url from fetched data, fallback to gray background
-                                            style={{ background: product.image_url?.includes('gradient') ? product.image_url : '#e5e7eb', backgroundImage: product.image_url && !product.image_url.includes('gradient') ? `url(${product.image_url})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center' }}
-                                        >
-                                            {/* Placeholder div in case image_url is just a gradient */}
-                                            {!product.image_url?.includes('gradient') && !product.image_url && <div className="h-full w-full bg-gray-200"></div>}
-
-                                            {product.is_on_sale && (
-                                                <div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-xs font-medium">
-                                                    تخفيض
-                                                </div>
-                                            )}
-                                             {/* --- FAVORITE BUTTON --- */}
-        <button
-            onClick={(e) => {
-                e.stopPropagation(); // Prevent card click (which opens product detail) when heart is clicked
-                handleToggleFavorite(product.id);
-            }}
-            // For RTL, top-right is usually the spot. Adjust if needed.
-            className="absolute top-2 right-2 p-1.5 bg-white/80 hover:bg-white rounded-full shadow-md transition-colors z-10" // Tailwind classes for styling
-            aria-label={userFavoriteProductIds.has(product.id) ? "Remove from favorites" : "Add to favorites"}
-        >
-            <Heart
-                className={`h-5 w-5 transition-all duration-150 ${
-                    userFavoriteProductIds.has(product.id)
-                        ? 'text-red-500 fill-red-500' // Favorited state
-                        : 'text-gray-400 hover:text-red-400' // Not favorited state
-                }`}
-                // Optional: Add strokeWidth if you want a thicker/thinner outline
-                // strokeWidth={userFavoriteProductIds.has(product.id) ? 2.5 : 2}
-            />
-        </button>
-        {/* End of Favorite Button */}
+        {/* 3. Content Area: Product Grid OR "No Products" Message */}
+        {/* Show this only if NOT in initial loading state AND no initial error */}
+        {!isLoadingProducts && !productError && (
+            <>
+                {fetchedProducts.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                        {fetchedProducts.map(product => (
+                            <motion.div
+                                key={product.id} // Database ID should be unique
+                                className="bg-white rounded-xl shadow-md overflow-hidden cursor-pointer flex flex-col"
+                                whileHover={{ y: -5, boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)' }}
+                                onClick={() => { /* TODO: setSelectedProduct(product); setShowProductDetailModal(true); */ }}
+                            >
+                                {/* Product Image Div with Favorite Button */}
+                                <div
+                                    className="h-32 w-full flex items-center justify-center text-white relative bg-gray-200"
+                                    style={{ background: product.image_url || 'linear-gradient(to right, #d1d5db, #9ca3af)' }} // Fallback gradient
+                                >
+                                    {product.is_on_sale && (
+                                        <div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-xs font-medium">
+                                            تخفيض
                                         </div>
-                                        <div className="p-3 flex flex-col flex-grow">
-                                            <h3 className="font-semibold text-sm mb-2 text-gray-800 flex-grow">{product.name}</h3>
-                                            <div className="flex items-center justify-between mt-auto">
-                                                <div>
-                                                    {product.is_on_sale && product.discount_price && (
-                                                        <span className="text-xs line-through text-gray-400 mr-1">
-                                                            {parseFloat(product.price).toFixed(2)} د.إ {/* Ensure formatting */}
-                                                        </span>
-                                                    )}
-                                                    <div className="text-blue-600 font-bold text-sm">
-                                                         {/* Use parseFloat and toFixed for price display */}
-                                                        {(product.is_on_sale && product.discount_price ? parseFloat(product.discount_price) : parseFloat(product.price)).toFixed(2)} د.إ
-                                                    </div>
-                                                </div>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        addToCart(product); // Product object now comes from fetched data
-                                                    }}
-                                                    className="p-2 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-500 hover:text-white transition-colors"
-                                                    aria-label={`Add ${product.name} to cart`}
-                                                >
-                                                    <ShoppingCart className="h-4 w-4" />
-                                                </button>
+                                    )}
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation(); // Prevent card click
+                                            handleToggleFavorite(product.id);
+                                        }}
+                                        className="absolute top-2 right-2 p-1.5 bg-white/80 hover:bg-white rounded-full shadow-sm transition-colors z-10"
+                                        aria-label={userFavoriteProductIds.has(product.id) ? "Remove from favorites" : "Add to favorites"}
+                                    >
+                                        <Heart
+                                            className={`h-5 w-5 ${userFavoriteProductIds.has(product.id) ? 'text-red-500 fill-red-500' : 'text-gray-400 hover:text-gray-600'}`}
+                                        />
+                                    </button>
+                                    {/* If no image_url, you could show a placeholder icon or text */}
+                                    {!product.image_url && <span className="text-gray-500 text-xs">No Image</span>}
+                                </div>
+
+                                {/* Product Info Div */}
+                                <div className="p-3 flex flex-col flex-grow">
+                                    <h3 className="font-semibold text-sm mb-1 text-gray-800 flex-grow min-h-[2.5em] line-clamp-2"> {/* Ensure consistent height and clamp long names */}
+                                        {product.name}
+                                    </h3>
+                                    <div className="flex items-end justify-between mt-auto"> {/* items-end to align price and button */}
+                                        <div>
+                                            {product.is_on_sale && product.discount_price && (
+                                                <span className="text-xs line-through text-gray-400 mr-1">
+                                                    {parseFloat(product.price).toFixed(2)} د.إ
+                                                </span>
+                                            )}
+                                            <div className="text-blue-600 font-bold text-base"> {/* Slightly larger price */}
+                                                {parseFloat(product.is_on_sale && product.discount_price ? product.discount_price : product.price).toFixed(2)} د.إ
                                             </div>
                                         </div>
-                                    </motion.div>
-                                ))}
-                            </div>
-                        )}
-
-                        {/* No Products Found State */}
-                         {!isLoadingProducts && !productError && fetchedProducts.length === 0 && (
-                            <p className="text-center text-gray-500 py-10">لا توجد منتجات لعرضها حالياً.</p>
-                         )}
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation(); // Prevent card click
+                                                addToCart(product);
+                                            }}
+                                            className="p-2 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-500 hover:text-white transition-colors"
+                                            aria-label={`Add ${product.name} to cart`}
+                                        >
+                                            <ShoppingCart className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        ))}
+                    </div>
+                ) : (
+                    // This message shows if initial load is complete, no errors, but fetchedProducts array is empty
+                    <div className="text-center text-gray-500 py-10">
+                        <Search className="h-12 w-12 mx-auto text-gray-400 mb-3" /> {/* Example Icon */}
+                        <p className="text-lg">لا توجد منتجات تطابق بحثك حالياً.</p>
+                        <p className="text-sm">جرب تعديل مصطلحات البحث أو الفلاتر.</p>
                     </div>
                 )}
+
+                {/* 4. "Load More" Button and its specific Loading/Error states */}
+                {fetchedProducts.length > 0 && currentProductPage < totalProductPages && !isLoadingMoreProducts && (
+                    <div className="text-center mt-8 mb-4"> {/* Added margin */}
+                        <button
+                            onClick={handleLoadMoreProducts}
+                            className="bg-sky-500 hover:bg-sky-600 text-white font-semibold py-2.5 px-8 rounded-lg shadow-md hover:shadow-lg transition-all duration-150 ease-in-out"
+                        >
+                            تحميل المزيد
+                        </button>
+                    </div>
+                )}
+
+                {isLoadingMoreProducts && (
+                    <div className="flex justify-center items-center h-20 mt-4">
+                        <p className="text-gray-500">جاري تحميل المزيد...</p>
+                        {/* You could put a spinner icon here */}
+                    </div>
+                )}
+
+                {/* Error specifically for "load more" - only show if currently trying to load more and it failed */}
+                {productError && isLoadingMoreProducts && ( // This condition might be tricky, usually productError would be for general load
+                    <div className="p-3 mt-4 text-sm text-red-700 bg-red-100 rounded-lg text-center" role="alert">
+                        <span className="font-medium">فشل!</span> لا يمكن تحميل المزيد من المنتجات.
+                    </div>
+                )}
+            </>
+        )}
+    </div>
+)}
 
 
                 {/* Suppliers Section (Still uses sample data) */}
