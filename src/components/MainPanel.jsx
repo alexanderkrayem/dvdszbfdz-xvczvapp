@@ -9,7 +9,11 @@ const MainPanel = ({ telegramUser }) => {
     const [selectedSupplier, setSelectedSupplier] = useState(null);
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [showCart, setShowCart] = useState(false);
-   
+   // Inside MainPanel component, with other useState hooks
+const [selectedProductDetails, setSelectedProductDetails] = useState(null); // Stores full details of the product being viewed
+const [showProductDetailModal, setShowProductDetailModal] = useState(false);
+const [isLoadingProductDetail, setIsLoadingProductDetail] = useState(false);
+const [productDetailError, setProductDetailError] = useState(null);
      // --- NEW: State for fetched cart ---
      const [cartItems, setCartItems] = useState([]);
      const [isLoadingCart, setIsLoadingCart] = useState(false); // Initially false, load when user is known
@@ -421,6 +425,35 @@ const handleAddressFormChange = (e) => {
 };
 
 // Inside MainPanel component
+// Inside MainPanel component
+const handleShowProductDetails = async (productId) => {
+    if (!productId) return;
+
+    console.log(`Fetching details for product ID: ${productId}`);
+    setShowProductDetailModal(true);
+    setIsLoadingProductDetail(true);
+    setProductDetailError(null);
+    setSelectedProductDetails(null); // Clear previous details
+
+    try {
+        const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/products/${productId}`;
+        const response = await fetch(apiUrl);
+
+        if (!response.ok) {
+            if (response.status === 404) {
+                throw new Error("المنتج غير موجود.");
+            }
+            throw new Error(`فشل تحميل تفاصيل المنتج: ${response.statusText}`);
+        }
+        const data = await response.json();
+        setSelectedProductDetails(data);
+    } catch (error) {
+        console.error("Error fetching product details:", error);
+        setProductDetailError(error.message);
+    } finally {
+        setIsLoadingProductDetail(false);
+    }
+};
 
 const handleToggleFavorite = async (productId) => {
     if (!telegramUser?.id || isLoadingFavorites) return; // Prevent action if no user or still loading initial favs
@@ -797,6 +830,120 @@ const proceedToCreateOrder = async () => {
       </motion.div>
   );
 
+// Inside MainPanel component
+const renderProductDetailModal = () => {
+    if (!showProductDetailModal) return null;
+
+    const product = selectedProductDetails; // Use the fetched full details
+
+    return (
+        <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4 overflow-y-auto" // Added overflow-y-auto
+            dir="rtl"
+            onClick={() => setShowProductDetailModal(false)} // Click outside to close
+        >
+            <motion.div
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 20, opacity: 0 }}
+                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                className="bg-white rounded-xl p-5 md:p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl" // Added max-h and overflow
+                onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside modal
+            >
+                {isLoadingProductDetail && (
+                    <div className="flex justify-center items-center min-h-[200px]">
+                        <p className="text-gray-500">جاري تحميل التفاصيل...</p>
+                        {/* Add a spinner icon here if desired */}
+                    </div>
+                )}
+                {productDetailError && !isLoadingProductDetail && (
+                    <div className="text-center py-10">
+                        <p className="text-red-500 font-semibold">خطأ!</p>
+                        <p className="text-gray-600 mt-2">{productDetailError}</p>
+                        <button
+                            onClick={() => setShowProductDetailModal(false)}
+                            className="mt-4 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300"
+                        >
+                            إغلاق
+                        </button>
+                    </div>
+                )}
+                {!isLoadingProductDetail && !productDetailError && product && (
+                    <>
+                        <div className="flex justify-between items-start mb-4">
+                            <h2 className="inline-block bg-blue-100 text-blue-700 text-xl md:text-2xl font-bold px-4 py-2 rounded-lg">{product.name}</h2>
+                            <button onClick={() => setShowProductDetailModal(false)} className="text-gray-400 hover:text-gray-600">
+                                <X className="h-7 w-7" />
+                            </button>
+                        </div>
+
+                        <div className="grid md:grid-cols-2 gap-6">
+                            {/* Image Section */}
+                            <div className="w-full h-64 md:h-auto bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
+                                {product.image_url ? (
+                                    <img src={product.image_url.startsWith('linear-gradient') ? undefined : product.image_url} // Don't use img src for gradients
+                                         style={product.image_url.startsWith('linear-gradient') ? { background: product.image_url, width: '100%', height: '100%', color: 'transparent' } : {}}
+                                         alt={product.name}
+                                         className="w-full h-full object-cover"
+                                    />
+                                ) : (
+                                    <span className="text-gray-400">لا توجد صورة</span>
+                                )}
+                            </div>
+
+                            {/* Details Section */}
+                            <div className="flex flex-col justify-between">
+                                <div>
+                                    {product.category && <p className="text-sm text-gray-500 mb-1">الفئة: {product.category}</p>}
+                                    {product.supplier_name && <p className="text-sm text-blue-600 mb-3">المورد: {product.supplier_name}</p>}
+
+                                    <p className="text-gray-700 mb-4 leading-relaxed">{product.description || "لا يوجد وصف متاح."}</p>
+
+                                    {product.is_on_sale && product.discount_price && (
+                                        <p className="text-lg text-gray-500 line-through mb-1">
+                                            {parseFloat(product.price).toFixed(2)} د.إ
+                                        </p>
+                                    )}
+                                    <p className="text-3xl font-extrabold text-blue-600 mb-4">
+                                        {parseFloat(product.is_on_sale && product.discount_price ? product.discount_price : product.price).toFixed(2)} د.إ
+                                    </p>
+                                    {product.stock_level !== null && product.stock_level > 0 && <p className="text-sm text-green-600 mb-1">متوفر ({product.stock_level} قطعة)</p>}
+                                    {product.stock_level !== null && product.stock_level === 0 && <p className="text-sm text-red-500 mb-1">نفذت الكمية</p>}
+                                </div>
+
+                                {/* Action Buttons */}
+                                <div className="mt-6 flex items-center gap-3">
+                                    <button
+                                        onClick={() => {
+                                            addToCart(product); // Ensure addToCart can handle this product structure
+                                            // setShowProductDetailModal(false); // Optionally close modal after adding
+                                        }}
+                                        disabled={product.stock_level === 0}
+                                        className="flex-grow bg-blue-500 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    >
+                                        <ShoppingCart className="h-5 w-5" />
+                                        إضافة للسلة
+                                    </button>
+                                    <button
+                                        onClick={() => handleToggleFavorite(product.id)}
+                                        className="p-3 border border-gray-300 rounded-lg text-gray-600 hover:border-red-500 hover:text-red-500 transition-colors"
+                                        aria-label="Toggle Favorite"
+                                    >
+                                        <Heart className={`h-5 w-5 ${userFavoriteProductIds.has(product.id) ? 'text-red-500 fill-red-500' : ''}`} />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </>
+                )}
+            </motion.div>
+        </motion.div>
+    );
+};
+
   // --- NEW: Function to render the Mini Cart Summary Bar ---
 const renderMiniCartBar = () => {
     if (isLoadingCart || cartItems.length === 0 || showCart) { // Don't show if loading, empty, or full cart is open
@@ -809,6 +956,7 @@ const renderMiniCartBar = () => {
     }, 0).toFixed(2);
 
     const totalCartItems = cartItems.reduce((acc, item) => acc + item.quantity, 0);
+// Inside MainPanel component
 
     return (
         <motion.div
@@ -936,8 +1084,8 @@ const renderMiniCartBar = () => {
                                                     key={`search-prod-${product.id}`} // Ensure unique key
                                                     className="bg-white rounded-xl shadow-md overflow-hidden cursor-pointer flex flex-col z-0" // Added z-0 to keep it under other modals if any
                                                     whileHover={{ y: -5, boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)' }}
-                                                    onClick={() => { /* TODO: Handle click to view product details */ }}
-                                                >
+                                                     onClick={() => handleShowProductDetails(product.id)} // MODIFIED
+>
                                                     <div className="h-32 w-full flex items-center justify-center text-white relative bg-gray-200" style={{ background: product.image_url || 'linear-gradient(to right, #d1d5db, #9ca3af)' }}>
                                                         {product.is_on_sale && (<div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-xs font-medium">تخفيض</div>)}
                                                         <button onClick={(e) => { e.stopPropagation(); handleToggleFavorite(product.id);}} className="absolute top-2 right-2 p-1.5 bg-white/80 hover:bg-white rounded-full shadow-sm z-10"><Heart className={`h-5 w-5 ${userFavoriteProductIds.has(product.id) ? 'text-red-500 fill-red-500' : 'text-gray-400 hover:text-gray-600'}`}/></button>
@@ -1042,9 +1190,11 @@ const renderMiniCartBar = () => {
                                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                                              {fetchedProducts.map(product => (
                                                  // Your Product Card from previous step
-                                                 <motion.div key={`tab-prod-${product.id}`} className="bg-white rounded-xl shadow-md overflow-hidden cursor-pointer flex flex-col z-0" whileHover={{ y: -5, boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)' }} onClick={() => { /* TODO: view product details */ }}>
+                                                 <motion.div key={`tab-prod-${product.id}`} className="bg-white rounded-xl shadow-md overflow-hidden cursor-pointer flex flex-col z-0" whileHover={{ y: -5, boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)' }} onClick={() => handleShowProductDetails(product.id)} // MODIFIED
+>
                                                      <div className="h-32 w-full flex items-center justify-center text-white relative bg-gray-200" style={{ background: product.image_url || 'linear-gradient(to right, #d1d5db, #9ca3af)' }}>
                                                          {product.is_on_sale && (<div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-xs font-medium">تخفيض</div>)}
+                                                    
                                                          <button onClick={(e) => { e.stopPropagation(); handleToggleFavorite(product.id);}} className="absolute top-2 right-2 p-1.5 bg-white/80 hover:bg-white rounded-full shadow-sm z-10"><Heart className={`h-5 w-5 ${userFavoriteProductIds.has(product.id) ? 'text-red-500 fill-red-500' : 'text-gray-400 hover:text-gray-600'}`}/></button>
                                                      </div>
                                                      <div className="p-3 flex flex-col flex-grow">
@@ -1164,7 +1314,12 @@ const renderMiniCartBar = () => {
                     </form>
                 </div>
             </motion.div>
+            
         )}
+        
+{/* --- ADD THIS LINE IF IT'S MISSING --- */}
+            {renderProductDetailModal()} 
+
     </div>
 )};
 
