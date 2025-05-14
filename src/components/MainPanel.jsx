@@ -14,6 +14,10 @@ const [selectedProductDetails, setSelectedProductDetails] = useState(null); // S
 const [showProductDetailModal, setShowProductDetailModal] = useState(false);
 const [isLoadingProductDetail, setIsLoadingProductDetail] = useState(false);
 const [productDetailError, setProductDetailError] = useState(null);
+// Inside MainPanel component, with other useState hooks
+const [fetchedFavoriteProducts, setFetchedFavoriteProducts] = useState([]);
+const [isLoadingFavoritesTab, setIsLoadingFavoritesTab] = useState(false);
+const [favoritesTabError, setFavoritesTabError] = useState(null);
      // --- NEW: State for fetched cart ---
      const [cartItems, setCartItems] = useState([]);
      const [isLoadingCart, setIsLoadingCart] = useState(false); // Initially false, load when user is known
@@ -329,7 +333,53 @@ useEffect(() => {
     }, []); // Empty array means run once on component mount
 
 // Inside MainPanel component
+// Inside MainPanel component, with other useEffect hooks
 
+useEffect(() => {
+    const fetchFullFavoriteProducts = async () => {
+        if (activeSection === 'favorites' && telegramUser?.id) {
+            setIsLoadingFavoritesTab(true);
+            setFavoritesTabError(null);
+            setFetchedFavoriteProducts([]); // Clear previous results
+
+            if (userFavoriteProductIds.size === 0) {
+                // No product IDs favorited, so no need to fetch details
+                console.log("No favorite product IDs to fetch details for.");
+                setIsLoadingFavoritesTab(false);
+                return;
+            }
+
+            try {
+                // Convert Set of IDs to a comma-separated string for the API
+                const idsString = Array.from(userFavoriteProductIds).join(',');
+                const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/products/batch?ids=${idsString}`;
+                
+                console.log("Fetching full favorite products from:", apiUrl);
+                const response = await fetch(apiUrl);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const productsData = await response.json();
+                
+                // The backend returns products, but not necessarily in the order of favoriting.
+                // If you want to sort them (e.g., by most recently favorited),
+                // you'd need to store 'added_at' in user_favorites and sort based on that,
+                // or sort by product name, etc. For now, we'll use the order from the API.
+                setFetchedFavoriteProducts(productsData);
+
+            } catch (error) {
+                console.error("Failed to fetch full favorite products:", error);
+                setFavoritesTabError(error.message);
+            } finally {
+                setIsLoadingFavoritesTab(false);
+            }
+        }
+    };
+
+    fetchFullFavoriteProducts();
+
+}, [activeSection, telegramUser?.id, userFavoriteProductIds, import.meta.env.VITE_API_BASE_URL]); // Dependencies
 
 // --- NEW: useEffect to fetch cart ---
 useEffect(() => {
@@ -1236,12 +1286,64 @@ const renderMiniCartBar = () => {
                         </div>
                     )}
                     {activeSection === 'favorites' && ( /* Placeholder for Favorites tab */
-                        <div className="text-center py-10">
-                            <Heart className="h-12 w-12 mx-auto text-gray-400 mb-3" />
-                            <p className="text-lg">قائمة المفضلة</p>
-                            <p className="text-sm">المنتجات التي أعجبتك ستظهر هنا.</p>
-                            {/* TODO: Implement Favorites fetching and display logic */}
-                        </div>
+                         <div className="space-y-4">
+        <h2 className="text-xl font-bold mb-4 text-gray-800">المفضلة</h2>
+
+        {isLoadingFavoritesTab && (
+            <div className="flex justify-center items-center h-40">
+                <p className="text-gray-500">جاري تحميل المفضلة...</p>
+            </div>
+        )}
+
+        {favoritesTabError && !isLoadingFavoritesTab && (
+            <div className="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg text-center" role="alert">
+                <span className="font-medium">خطأ!</span> لا يمكن تحميل قائمة المفضلة.
+                <p className="text-xs mt-1">{favoritesTabError}</p>
+            </div>
+        )}
+
+        {!isLoadingFavoritesTab && !favoritesTabError && (
+            <>
+                {fetchedFavoriteProducts.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                        {fetchedFavoriteProducts.map(product => (
+                            // ** REUSE YOUR ProductCard COMPONENT/JSX HERE **
+                            // Pass all necessary props: product, userFavoriteProductIds, 
+                            // handleToggleFavorite, addToCart, handleShowProductDetails
+                            <motion.div
+                                key={`fav-prod-${product.id}`}
+                                className="bg-white rounded-xl shadow-md overflow-hidden cursor-pointer flex flex-col z-0"
+                                whileHover={{ y: -5, boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)' }}
+                                onClick={() => handleShowProductDetails(product.id)}
+                            >
+                                <div className="h-32 w-full flex items-center justify-center text-white relative bg-gray-200" style={{ background: product.image_url || 'linear-gradient(to right, #d1d5db, #9ca3af)' }}>
+                                    {product.is_on_sale && (<div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-xs font-medium">تخفيض</div>)}
+                                    <button onClick={(e) => { e.stopPropagation(); handleToggleFavorite(product.id);}} className="absolute top-2 right-2 p-1.5 bg-white/80 hover:bg-white rounded-full shadow-sm z-10"><Heart className={`h-5 w-5 ${userFavoriteProductIds.has(product.id) ? 'text-red-500 fill-red-500' : 'text-gray-400 hover:text-gray-600'}`}/></button>
+                                </div>
+                                <div className="p-3 flex flex-col flex-grow">
+                                    <h3 className="font-semibold text-sm mb-1 text-gray-800 flex-grow min-h-[2.5em] line-clamp-2">{product.name}</h3>
+                                    <div className="flex items-end justify-between mt-auto">
+                                        <div>
+                                            {product.is_on_sale && product.discount_price && (<span className="text-xs line-through text-gray-400 mr-1">{parseFloat(product.price).toFixed(2)} د.إ</span>)}
+                                            <div className="text-blue-600 font-bold text-base">{parseFloat(product.is_on_sale && product.discount_price ? product.discount_price : product.price).toFixed(2)} د.إ</div>
+                                        </div>
+                                        <button onClick={(e) => { e.stopPropagation(); addToCart(product);}} className="p-2 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-500 hover:text-white"><ShoppingCart className="h-4 w-4" /></button>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-center text-gray-500 py-10">
+                        <Heart className="h-12 w-12 mx-auto text-gray-400 mb-3" />
+                        <p className="text-lg">قائمة المفضلة فارغة.</p>
+                        <p className="text-sm">أضف منتجات تعجبك بالضغط على أيقونة القلب!</p>
+                    </div>
+                )}
+            </>
+        )}
+    </div>
+                
                     )}
                     {activeSection === 'orders' && ( /* Placeholder for Orders tab */
                         <div className="text-center py-10">
