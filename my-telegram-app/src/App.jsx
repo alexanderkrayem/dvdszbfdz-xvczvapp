@@ -1,35 +1,46 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+// src/App.jsx
+import React, { useEffect, useState } from 'react';
+import MainPanel from './components/MainPanel'; // Import your MainPanel component
+
+// Access the Telegram Web App object safely
+const tg = window.Telegram?.WebApp;
 
 function App() {
-  const [count, setCount] = useState(0)
 
+  const [telegramUser, setTelegramUser] = useState(null);
+
+  useEffect(() => {
+    // This code runs once when the app starts
+    if (tg) {
+      console.log("Telegram WebApp SDK found. Calling tg.ready().");
+      tg.ready(); // IMPORTANT: Tell Telegram the app is ready
+
+      // Log initial data (useful for debugging in Telegram)
+      console.log("InitData Unsafe:", tg.initDataUnsafe);
+      if (tg.initDataUnsafe?.user) {
+        console.log("User:", tg.initDataUnsafe.user);
+        setTelegramUser(tg.initDataUnsafe.user);
+      } else {
+        console.log("User data not available within initDataUnsafe.");
+      }
+    } else {
+      // This message will likely show when running in a normal browser
+      console.warn("Telegram WebApp SDK (window.Telegram.WebApp) not found. App might not function fully outside Telegram.");
+    }
+
+    // Cleanup function (optional)
+    return () => {
+      if (tg) {
+        // You might add cleanup here later if you use things like tg.MainButton.onClick
+      }
+    }
+  }, []); // Empty dependency array means run once on mount
+
+  // Render the MainPanel component which now handles its own data fetching
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <MainPanel telegramUser={telegramUser} />
+  );
+
 }
 
-export default App
+export default App;
