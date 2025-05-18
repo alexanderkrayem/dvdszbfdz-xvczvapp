@@ -5,6 +5,7 @@ import { Clock, MapPin, Plus, Minus, Trash2, Star, ShoppingCart, Search, X, Hear
 import { motion, AnimatePresence } from 'framer-motion';
 
 const MainPanel = ({ telegramUser }) => {
+    const PRODUCT_LIMIT_FOR_SEARCH = 10; // Define this constant
     const [activeSection, setActiveSection] = useState('exhibitions');
     const [selectedSupplier, setSelectedSupplier] = useState(null);
     const [selectedProduct, setSelectedProduct] = useState(null);
@@ -30,7 +31,7 @@ const [searchTerm, setSearchTerm] = useState('');
 // We'll add isSearching, searchResults, etc., later
 // Inside MainPanel component
 const [isSearching, setIsSearching] = useState(false);
-const [searchResults, setSearchResults] = useState({ products: [], deals: [], suppliers: [] });
+const [searchResults, setSearchResults] = useState({ products: { items: [], currentPage: 1, totalPages: 0, totalItems: 0, limit: PRODUCT_LIMIT_FOR_SEARCH  /* or your constant */ }, deals: [], suppliers: [] });
 const [searchError, setSearchError] = useState(null);
 const [showSearchResultsView, setShowSearchResultsView] = useState(false); // To toggle views
 // Inside MainPanel component, with other useState hooks
@@ -86,24 +87,32 @@ const debounce = (func, delay) => {
 };
 // Inside MainPanel component, after debounce function
 // Inside MainPanel component - replace the previous performSearch
-const performSearch = useCallback(
-    debounce(async (currentSearchTerm) => {
+const debouncedSearch = useCallback(
+    debounce(async (currentSearchTerm, page = 1) => { // Only needs searchTerm and page
         const trimmedTerm = currentSearchTerm.trim();
+
         if (trimmedTerm.length < 3) {
             console.log("Search term too short, hiding results view.");
             setShowSearchResultsView(false);
-            setSearchResults({ products: [], deals: [], suppliers: [] });
+            setSearchResults({ products: { items: [], currentPage: 1, totalPages: 0, totalItems: 0, limit: PRODUCT_LIMIT_FOR_SEARCH }, deals: [], suppliers: [] });
             setIsSearching(false);
             return;
         }
 
-        console.log(`Calling API to search for: "${trimmedTerm}"`);
+        console.log(`[FRONTEND DEBOUNCED SEARCH] Calling API to search for: "${trimmedTerm}" on page: ${page}`);
         setIsSearching(true);
         setSearchError(null);
-        setShowSearchResultsView(true); // Prepare to show results view
+        setShowSearchResultsView(true);
+
+        // --- CONSTRUCT API URL (Simpler: only searchTerm, page, limit) ---
+        let apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/search?page=${page}&limit=${PRODUCT_LIMIT_FOR_SEARCH}`;
+        if (trimmedTerm) { // Always true if we pass the length check, but good practice
+            apiUrl += `&searchTerm=${encodeURIComponent(trimmedTerm)}`;
+        }
+        
+        console.log("[FRONTEND DEBOUNCED SEARCH] Constructed API URL:", apiUrl);
 
         try {
-            const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/search?searchTerm=${encodeURIComponent(trimmedTerm)}`;
             const response = await fetch(apiUrl);
 
             if (!response.ok) {
@@ -111,24 +120,38 @@ const performSearch = useCallback(
                 throw new Error(errData.error || errData.message || `Search request failed: ${response.statusText}`);
             }
             const data = await response.json();
-            console.log("Search API Response:", data); // Log the received data
-            setSearchResults(data.results || { products: [], deals: [], suppliers: [] });
+            // console.log("[FRONTEND DEBOUNCED SEARCH] API Response 'data' object:", JSON.stringify(data, null, 2));
+
+            if (data && data.results) {
+                // console.log("[FRONTEND DEBOUNCED SEARCH] Setting searchResults with data.results.products:", JSON.stringify(data.results.products, null, 2));
+                setSearchResults({
+                    products: data.results.products || { items: [], currentPage: 1, totalPages: 0, totalItems: 0, limit: PRODUCT_LIMIT_FOR_SEARCH },
+                    deals: data.results.deals || [],
+                    suppliers: data.results.suppliers || []
+                });
+                // If you want to store current page/total pages for product search results specifically:
+                // setCurrentProductSearchPage(data.results.products?.currentPage || 1);
+                // setTotalProductSearchPages(data.results.products?.totalPages || 0);
+            } else {
+                console.error("[FRONTEND DEBOUNCED SEARCH] Unexpected API response structure (missing data.results):", data);
+                setSearchResults({ products: { items: [], currentPage: 1, totalPages: 0, totalItems: 0, limit: PRODUCT_LIMIT_FOR_SEARCH }, deals: [], suppliers: [] });
+            }
         } catch (error) {
-            console.error("Global search API error:", error);
+            console.error("[FRONTEND DEBOUNCED SEARCH] Global search API error:", error);
             setSearchError(error.message);
-            setSearchResults({ products: [], deals: [], suppliers: [] }); // Clear on error
+            setSearchResults({ products: { items: [], currentPage: 1, totalPages: 0, totalItems: 0, limit: PRODUCT_LIMIT_FOR_SEARCH }, deals: [], suppliers: [] });
         } finally {
             setIsSearching(false);
         }
     }, 500),
-    [import.meta.env.VITE_API_BASE_URL] // Add dependency
+    [import.meta.env.VITE_API_BASE_URL, PRODUCT_LIMIT_FOR_SEARCH] // Dependencies
 );
 
 // Inside MainPanel component
 const clearSearch = () => {
     setSearchTerm('');
     setShowSearchResultsView(false);
-    setSearchResults({ products: [], deals: [], suppliers: [] });
+    setSearchResults({ products: { items: [], currentPage: 1, totalPages: 0, totalItems: 0, limit: PRODUCT_LIMIT_FOR_SEARCH /* or your constant */ }, deals: [], suppliers: [] });
     setIsSearching(false);
     // setActiveSection('products'); // Optional: Reset to default tab
 };
@@ -174,11 +197,11 @@ const handleSearchInputChange = (e) => {
         // performSearch.cancel?.(); // If using lodash.debounce
         console.log("Search cleared.");
         setShowSearchResultsView(false); // Hide search results view
-        setSearchResults({ products: [], deals: [], suppliers: [] });
+        setSearchResults({ products: { items: [], currentPage: 1, totalPages: 0, totalItems: 0, limit: PRODUCT_LIMIT_FOR_SEARCH /* or your constant */ }, deals: [], suppliers: [] });
         setIsSearching(false);
         // setActiveSection('products'); // Optional: reset to default tab
     } else {
-        performSearch(newSearchTerm);
+        debouncedSearch(newSearchTerm, 1);
     }
 };
 
@@ -1065,6 +1088,8 @@ const renderMiniCartBar = () => {
         </motion.div>
     );
 };
+
+
     return (
     <div className="min-h-screen bg-gray-50" dir="rtl">
         {/* Header */}
@@ -1146,46 +1171,64 @@ const renderMiniCartBar = () => {
                     {searchError && <p className="text-center text-red-500 py-10">خطأ في البحث: {searchError}</p>}
 
                     {!isSearching && !searchError && (
-                        (searchResults.products.length === 0 && searchResults.deals.length === 0 && searchResults.suppliers.length === 0 && searchTerm.trim().length >=3 ) ? (
-                            <div className="text-center text-gray-500 py-10">
-                                <Search className="h-12 w-12 mx-auto text-gray-400 mb-3" />
-                                <p className="text-lg">لا توجد نتائج لـ "{searchTerm}"</p>
-                                <p className="text-sm">جرب تعديل كلمة البحث.</p>
-                            </div>
+                         ( (searchResults.products?.items?.length === 0 || !searchResults.products?.items) && // Corrected check
+      (searchResults.deals?.length === 0 || !searchResults.deals) &&
+      (searchResults.suppliers?.length === 0 || !searchResults.suppliers) &&
+      searchTerm.trim().length >=3 
+    ) ? (
+        <div className="text-center text-gray-500 py-10">
+            <Search className="h-12 w-12 mx-auto text-gray-400 mb-3" />
+            <p className="text-lg">لا توجد نتائج لـ "{searchTerm}"</p>
+            <p className="text-sm">جرب تعديل كلمة البحث.</p>
+        </div>
                         ) : (
                             <div className="space-y-8"> {/* Space between result categories */}
                                 {/* Products Search Results */}
-                                {searchResults.products.length > 0 && (
-                                    <section>
-                                        <h3 className="text-lg font-semibold mb-3 text-gray-800 border-b pb-1">المنتجات ({searchResults.products.length})</h3>
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-2">
-                                            {searchResults.products.map(product => (
-                                                // **YOUR ACTUAL PRODUCT CARD COMPONENT/JSX HERE**
-                                                // Example: <ProductCard key={product.id} product={product} {...otherNeededProps} />
-                                                <motion.div
-                                                    key={`search-prod-${product.id}`} // Ensure unique key
-                                                    className="bg-white rounded-xl shadow-md overflow-hidden cursor-pointer flex flex-col z-0" // Added z-0 to keep it under other modals if any
-                                                    whileHover={{ y: -5, boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)' }}
-                                                     onClick={() => handleShowProductDetails(product.id)} // MODIFIED
->
-                                                    <div className="h-32 w-full flex items-center justify-center text-white relative bg-gray-200" style={{ background: product.image_url || 'linear-gradient(to right, #d1d5db, #9ca3af)' }}>
-                                                        {product.is_on_sale && (<div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-xs font-medium">تخفيض</div>)}
-                                                        <button onClick={(e) => { e.stopPropagation(); handleToggleFavorite(product.id);}} className="absolute top-2 right-2 p-1.5 bg-white/80 hover:bg-white rounded-full shadow-sm z-10"><Heart className={`h-5 w-5 ${userFavoriteProductIds.has(product.id) ? 'text-red-500 fill-red-500' : 'text-gray-400 hover:text-gray-600'}`}/></button>
-                                                    </div>
-                                                    <div className="p-3 flex flex-col flex-grow">
-                                                        <h4 className="font-semibold text-sm mb-1 text-gray-800 flex-grow min-h-[2.5em] line-clamp-2">{product.name}</h4>
-                                                        <div className="flex items-end justify-between mt-auto">
-                                                            <div>
-                                                                {product.is_on_sale && product.discount_price && (<span className="text-xs line-through text-gray-400 mr-1">{parseFloat(product.price).toFixed(2)} د.إ</span>)}
-                                                                <div className="text-blue-600 font-bold text-base">{parseFloat(product.is_on_sale && product.discount_price ? product.discount_price : product.price).toFixed(2)} د.إ</div>
-                                                            </div>
-                                                            <button onClick={(e) => { e.stopPropagation(); addToCart(product);}} className="p-2 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-500 hover:text-white"><ShoppingCart className="h-4 w-4" /></button>
-                                                        </div>
-                                                    </div>
-                                                </motion.div>
-                                            ))}
-                                        </div>
-                                    </section>
+                               {searchResults.products && searchResults.products.items && searchResults.products.items.length > 0 ? ( // CORRECTED CONDITION
+    <section>
+        <h3 className="text-lg font-semibold mb-3 text-gray-800 border-b pb-1">
+            المنتجات ({searchResults.products.totalItems || searchResults.products.items.length}) {/* CORRECTED COUNT */}
+        </h3>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-2">
+            {searchResults.products.items.map(product => ( // CORRECTED MAP
+                <motion.div
+                    key={`search-prod-${product.id}`}
+                    className="bg-white rounded-xl shadow-md overflow-hidden cursor-pointer flex flex-col z-0"
+                    whileHover={{ y: -5, boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)' }}
+                    onClick={() => handleShowProductDetails(product.id)}
+                >
+                    <div className="h-32 w-full flex items-center justify-center text-white relative bg-gray-200" style={{ background: product.image_url || 'linear-gradient(to right, #d1d5db, #9ca3af)' }}>
+                        {product.is_on_sale && (<div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-xs font-medium">تخفيض</div>)}
+                        <button onClick={(e) => { e.stopPropagation(); handleToggleFavorite(product.id);}} className="absolute top-2 right-2 p-1.5 bg-white/80 hover:bg-white rounded-full shadow-sm z-10">
+                            <Heart className={`h-5 w-5 ${userFavoriteProductIds.has(product.id) ? 'text-red-500 fill-red-500' : 'text-gray-400 hover:text-gray-600'}`}/>
+                        </button>
+                    </div>
+                    <div className="p-3 flex flex-col flex-grow">
+                        <h4 className="font-semibold text-sm mb-1 text-gray-800 flex-grow min-h-[2.5em] line-clamp-2">{product.name}</h4>
+                        <div className="flex items-end justify-between mt-auto">
+                            <div>
+                                {product.is_on_sale && product.discount_price && (<span className="text-xs line-through text-gray-400 mr-1">{parseFloat(product.price).toFixed(2)} د.إ</span>)}
+                                <div className="text-blue-600 font-bold text-base">{parseFloat(product.is_on_sale && product.discount_price ? product.discount_price : product.price).toFixed(2)} د.إ</div>
+                            </div>
+                            <button onClick={(e) => { e.stopPropagation(); addToCart(product);}} className="p-2 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-500 hover:text-white">
+                                <ShoppingCart className="h-4 w-4" />
+                            </button>
+                        </div>
+                    </div>
+                </motion.div>
+            ))}
+        </div>
+        {/* TODO: Add pagination controls here for searchResults.products if totalPages > 1 */}
+    </section>
+) : (
+    // Optional: Only show "no products match" if a search was made and other results might exist
+    // This condition needs to be careful not to show if deals/suppliers *were* found.
+    // The outer "no results for searchTerm" handles the case where everything is empty.
+    // So, if searchResults.products.items is empty, this section just won't render, which is fine.
+    // If you want a specific "No products found for this search, but here are deals..." message,
+    // you'd add an else here, but only if searchTerm is active.
+    null 
+
                                 )}
 
                                 {/* Deals Search Results */}
