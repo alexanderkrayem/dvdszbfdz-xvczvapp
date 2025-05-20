@@ -47,7 +47,9 @@ const [dealDetailError, setDealDetailError] = useState(null);
     const [fetchedProducts, setFetchedProducts] = useState([]); // To store products from API
     const [isLoadingProducts, setIsLoadingProducts] = useState(false); // Track loading state
     const [productError, setProductError] = useState(null); // Track fetching errors
-
+// ... existing state ...
+const [activeMiniCartItem, setActiveMiniCartItem] = useState(null); // Stores the product object (or just ID) for the temporary control panel
+const [showActiveItemControls, setShowActiveItemControls] = useState(false);
     // Inside MainPanel component, with other useState hooks
 const [selectedSupplierDetails, setSelectedSupplierDetails] = useState(null);
 const [showSupplierDetailModal, setShowSupplierDetailModal] = useState(false);
@@ -478,21 +480,19 @@ const handleAddressFormChange = (e) => {
 
  // Inside MainPanel component
 
- const addToCart = async (product) => {
+ // Inside MainPanel.jsx
+
+const addToCart = async (product) => {
     if (!telegramUser?.id) {
         alert("Cannot add to cart: User information not loaded.");
         return;
     }
     if (!product?.id) {
         console.error("Cannot add to cart: Invalid product data", product);
-        alert("Error: Could not add product to cart due to invalid product data."); // User-facing feedback
         return;
     }
 
-    console.log(`Adding product ${product.id} (${product.name}) to cart for user ${telegramUser.id}`);
-    // You could add a specific loading state for this action if you want,
-    // e.g., by disabling the button or showing a spinner.
-    // For now, the general cart loading state from doFetchCart will cover the refresh.
+    console.log(`Adding product ${product.id} (name: ${product.name}) to cart for user ${telegramUser.id}`);
 
     try {
         const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/cart`;
@@ -504,41 +504,45 @@ const handleAddressFormChange = (e) => {
             body: JSON.stringify({
                 userId: telegramUser.id,
                 productId: product.id,
-                quantity: 1 // Your backend POST adds this quantity
+                quantity: 1 // Assuming POST adds 1 or creates with 1
             }),
         });
 
         if (!response.ok) {
-            // Try to get more specific error message from backend if possible
-            let errorMsg = `HTTP error! status: ${response.status}`;
-            try {
-                const errorData = await response.json();
-                if (errorData && errorData.error) {
-                    errorMsg = errorData.error;
-                }
-            } catch (e) {
-                // Ignore if response body isn't JSON or is empty
-            }
-            throw new Error(errorMsg);
+            const errorData = await response.json().catch(() => ({})); // Try to get error details
+            throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
         }
 
-        // No need to parse updatedItem if we are refetching the whole cart
-        // const updatedItem = await response.json();
-        // console.log("Item added/updated via POST:", updatedItem);
+        const backendCartItem = await response.json(); // Contains at least { product_id, quantity, user_id }
+        console.log("Item added/updated in backend:", backendCartItem);
 
-        // --- IMPORTANT: Refetch the entire cart to ensure UI consistency ---
-        await doFetchCart();
+        // Refetch the entire cart to ensure UI consistency
+        await doFetchCart(); 
+        // After doFetchCart(), cartItems state should be up-to-date.
 
-        // Optionally show notification or open cart after successful addition
-        setShowCart(true); // Open the cart sidebar
-        // You could also add a small success toast/notification here
+        // Find the newly added/updated item from the global cartItems state
+        // to get all its details (name, image_url, etc.) along with the correct quantity.
+        const updatedItemFromGlobalCart = cartItems.find(item => item.product_id === product.id);
+
+        if (updatedItemFromGlobalCart) {
+            setActiveMiniCartItem(updatedItemFromGlobalCart);
+        } else {
+            // This is a fallback, ideally updatedItemFromGlobalCart should always be found
+            // if doFetchCart() is successful and backendCartItem.product_id matches product.id
+            console.warn(`Item ${product.name} (ID: ${product.id}) not found in global cartItems after add/update. Using provided product data.`);
+            setActiveMiniCartItem({ 
+                ...product, // Spread original product details
+                quantity: backendCartItem.quantity, // Use quantity from backend response
+                product_id: product.id // Ensure product_id is consistent
+            });
+        }
+        setShowActiveItemControls(true);
 
     } catch (error) {
         console.error("Failed to add item to cart:", error);
-        alert(`Error adding item to cart: ${error.message}`); // Show error to user
-    } finally {
-        // Reset any specific "adding to cart" loading state here if you implemented one
+        alert(`Error adding item to cart: ${error.message}`);
     }
+    // No longer automatically opens the full cart sidebar: setShowCart(true);
 };
 
 // Inside MainPanel component
@@ -622,30 +626,28 @@ const handleToggleFavorite = async (productId) => {
 // Function to handle increasing quantity (or adding if not present)
 const handleIncreaseQuantity = async (productId) => {
     if (!telegramUser?.id) return;
-
-    // Find the item in the current cart to get its current quantity
-    const itemInCart = cartItems.find(item => item.product_id === productId);
-    const currentQuantity = itemInCart ? itemInCart.quantity : 0;
-
-    // If using POST to increment (as in original addToCart)
-    // This assumes POST /api/cart with quantity:1 always means "add one more"
-    // or creates the item with quantity 1 if not existing.
-    // If POST always SETS quantity, then this logic changes.
-    // Our current POST with ON CONFLICT adds the provided quantity.
-    console.log(`Increasing quantity for product ${productId} (current: ${currentQuantity})`);
+    console.log(`Increasing quantity for product ${productId}`);
     try {
         const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/cart`;
         const response = await fetch(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                userId: telegramUser.id,
-                productId: productId,
-                quantity: 1 // Always add 1
-            }),
+            body: JSON.stringify({ userId: telegramUser.id, productId: productId, quantity: 1 }),
         });
         if (!response.ok) throw new Error(`Failed to increase quantity: ${response.statusText}`);
-        await doFetchCart(); // Refetch cart to update UI
+        
+        await doFetchCart(); // Refetch cart
+
+        // Update activeMiniCartItem if it's the one being changed
+        if (showActiveItemControls && activeMiniCartItem?.product_id === productId) {
+            const stillInCart = cartItems.find(item => item.product_id === productId);
+            if (stillInCart) {
+                setActiveMiniCartItem(stillInCart);
+            } else { // Should not happen if only increasing quantity
+                setShowActiveItemControls(false);
+                setActiveMiniCartItem(null);
+            }
+        }
     } catch (error) {
         console.error("Error increasing quantity:", error);
         alert(`Error: ${error.message}`);
@@ -655,20 +657,14 @@ const handleIncreaseQuantity = async (productId) => {
 // Function to handle decreasing quantity
 const handleDecreaseQuantity = async (productId) => {
     if (!telegramUser?.id) return;
+    console.log(`Decreasing quantity for product ${productId}`);
 
     const itemInCart = cartItems.find(item => item.product_id === productId);
-    if (!itemInCart) {
-        console.warn("Attempted to decrease quantity of item not in cart.");
-        return;
-    }
-
-    console.log(`Decreasing quantity for product ${productId} (current: ${itemInCart.quantity})`);
+    if (!itemInCart) return;
 
     if (itemInCart.quantity <= 1) {
-        // If quantity is 1 or less, remove the item
-        await handleRemoveItem(productId);
+        await handleRemoveItem(productId); // This will also update activeMiniCartItem if needed
     } else {
-        // Decrease quantity by 1 using the PUT endpoint
         try {
             const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/cart/item/${productId}?userId=${telegramUser.id}`;
             const response = await fetch(apiUrl, {
@@ -677,7 +673,17 @@ const handleDecreaseQuantity = async (productId) => {
                 body: JSON.stringify({ newQuantity: itemInCart.quantity - 1 }),
             });
             if (!response.ok) throw new Error(`Failed to decrease quantity: ${response.statusText}`);
+            
             await doFetchCart(); // Refetch cart
+
+            // Update activeMiniCartItem if it's the one being changed
+            if (showActiveItemControls && activeMiniCartItem?.product_id === productId) {
+                const stillInCart = cartItems.find(item => item.product_id === productId);
+                 // stillInCart should always exist here since quantity was > 1
+                if (stillInCart) {
+                    setActiveMiniCartItem(stillInCart);
+                }
+            }
         } catch (error) {
             console.error("Error decreasing quantity:", error);
             alert(`Error: ${error.message}`);
@@ -688,15 +694,19 @@ const handleDecreaseQuantity = async (productId) => {
 // Function to handle removing an item completely
 const handleRemoveItem = async (productId) => {
     if (!telegramUser?.id) return;
-
     console.log(`Removing product ${productId} from cart`);
     try {
         const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/cart/item/${productId}?userId=${telegramUser.id}`;
-        const response = await fetch(apiUrl, {
-            method: 'DELETE',
-        });
+        const response = await fetch(apiUrl, { method: 'DELETE' });
         if (!response.ok) throw new Error(`Failed to remove item: ${response.statusText}`);
+        
         await doFetchCart(); // Refetch cart
+
+        // If the removed item was the active one, hide the controls
+        if (showActiveItemControls && activeMiniCartItem?.product_id === productId) {
+            setShowActiveItemControls(false);
+            setActiveMiniCartItem(null);
+        }
     } catch (error) {
         console.error("Error removing item:", error);
         alert(`Error: ${error.message}`);
@@ -1284,42 +1294,123 @@ const renderProductDetailModal = () => {
 };
 
   // --- NEW: Function to render the Mini Cart Summary Bar ---
+// Inside MainPanel.jsx
+
 const renderMiniCartBar = () => {
-    if (isLoadingCart || cartItems.length === 0 || showCart) { // Don't show if loading, empty, or full cart is open
-        return null;
+    // Don't show mini bar OR active controls if full cart is open OR if currently checking out
+    if (showCart || isCheckingOut || isCreatingOrder) return null; 
+
+    let totalCartPrice = "0.00";
+    let totalCartItems = 0;
+    if (cartItems.length > 0) {
+        totalCartPrice = cartItems.reduce((total, item) => {
+            const price = item.is_on_sale && item.discount_price ? item.discount_price : item.price;
+            return total + (parseFloat(price) * item.quantity);
+        }, 0).toFixed(2);
+        totalCartItems = cartItems.reduce((acc, item) => acc + item.quantity, 0);
     }
 
-    const totalCartPrice = cartItems.reduce((total, item) => {
-        const price = item.is_on_sale && item.discount_price ? item.discount_price : item.price;
-        return total + (parseFloat(price) * item.quantity);
-    }, 0).toFixed(2);
+    const renderActiveItemControls = () => {
+        if (!showActiveItemControls || !activeMiniCartItem) return null;
+        
+        const currentItemInCart = cartItems.find(item => item.product_id === activeMiniCartItem.product_id);
+        const displayItem = currentItemInCart || activeMiniCartItem;
 
-    const totalCartItems = cartItems.reduce((acc, item) => acc + item.quantity, 0);
-// Inside MainPanel component
+        if (!displayItem || typeof displayItem.quantity === 'undefined' || displayItem.quantity === 0) {
+            // If quantity is 0 after an update, it means it was removed, so hide controls
+            if (displayItem.quantity === 0 && showActiveItemControls){
+                 setShowActiveItemControls(false);
+                 setActiveMiniCartItem(null);
+            }
+            return null;
+        }
 
-    return (
-        <motion.div
-            initial={{ y: 100 }} // Start off-screen
-            animate={{ y: 0 }}   // Animate to on-screen
-            exit={{ y: 100 }}     // Animate off-screen
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="fixed bottom-0 left-0 right-0 bg-white shadow-top-md p-3 z-40" // shadow-top-md is a custom class you might need to define or use existing shadow
-            dir="rtl"
-        >
-            <div className="max-w-4xl mx-auto flex justify-between items-center">
-                <div>
-                    <span className="font-semibold">{totalCartItems} عنصر</span>
-                    <span className="mx-2">|</span>
-                    <span className="font-bold text-blue-600">{totalCartPrice} د.إ</span>
-                </div>
+        return (
+            <motion.div
+                key={`active-item-${displayItem.product_id}`}
+                initial={{ opacity: 0, y: 20 }} // Slightly different animation
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 20 }}
+                transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+                className="relative bg-white p-3 shadow-xl rounded-t-lg border-b border-gray-200 w-full" // Ensure it takes full width of its container
+            >
                 <button
-                    onClick={() => setShowCart(true)} // This opens the full cart sidebar
-                    className="bg-blue-500 text-white px-5 py-2 rounded-lg hover:bg-blue-600 text-sm"
+                    onClick={() => {
+                        setShowActiveItemControls(false);
+                        setActiveMiniCartItem(null);
+                    }}
+                    className="absolute top-2 left-2 p-1 text-gray-400 hover:text-gray-600 rounded-full bg-gray-50 hover:bg-gray-100 z-10"
+                    aria-label="Close active item controls"
                 >
-                    عرض السلة
+                    <X className="h-3.5 w-3.5" />
                 </button>
+
+                <div className="flex items-center justify-between gap-3 pl-6"> {/* Adjusted padding for RTL: pl-6 if X is on left */}
+                    <div className="flex items-center gap-2 flex-grow min-w-0"> {/* min-w-0 for truncate */}
+                        {displayItem.image_url && (
+                             <div 
+                                className="w-10 h-10 rounded bg-gray-200 flex-shrink-0"
+                                style={displayItem.image_url.startsWith('linear-gradient') ? 
+                                       { background: displayItem.image_url } : 
+                                       { backgroundImage: `url(${displayItem.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+                            ></div>
+                        )}
+                        <span className="text-xs font-medium text-gray-700 truncate">{displayItem.name}</span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <button onClick={() => handleDecreaseQuantity(displayItem.product_id)} className="p-1.5 bg-gray-100 rounded-md hover:bg-gray-200"><Minus className="h-3.5 w-3.5 text-gray-700"/></button>
+                        <span className="text-sm font-semibold w-6 text-center tabular-nums">{displayItem.quantity}</span>
+                        <button onClick={() => handleIncreaseQuantity(displayItem.product_id)} className="p-1.5 bg-gray-100 rounded-md hover:bg-gray-200"><Plus className="h-3.5 w-3.5 text-gray-700"/></button>
+                        <button onClick={() => handleRemoveItem(displayItem.product_id)} className="p-1.5 text-red-500 hover:text-red-700 rounded-md hover:bg-red-50"><Trash2 className="h-4 w-4"/></button>
+                    </div>
+                </div>
+            </motion.div>
+        );
+    };
+
+    if (cartItems.length === 0 && !showActiveItemControls) { // If cart empty and no active item to show, render nothing
+        return null;
+    }
+    
+    // If only active item controls are shown (cart became empty but controls are still up)
+    // Or if both cart summary and active controls are shown.
+    return (
+        <div className="fixed bottom-0 left-0 right-0 z-40 flex flex-col items-center" dir="rtl"> {/* Centering the bar container */}
+            <div className="w-full max-w-4xl px-2 sm:px-0"> {/* Max width like main content, with padding for small screens */}
+                <AnimatePresence>
+                    {showActiveItemControls && activeMiniCartItem && renderActiveItemControls()}
+                </AnimatePresence>
+                
+                {cartItems.length > 0 && ( // Only show the summary bar if there are items actually in the cart
+                    <motion.div
+                        initial={showActiveItemControls ? { y:0 } : { y: 100 }} // Don't animate from bottom if active controls were just above it
+                        animate={{ y: 0 }}
+                        exit={{ y: 100 }}
+                        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                        className={`bg-gray-800 text-white shadow-top-md p-3 w-full ${showActiveItemControls ? '' : 'rounded-t-lg'}`} // Conditional rounding
+                    >
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <span className="font-semibold">{totalCartItems} عنصر</span>
+                                <span className="mx-2">|</span>
+                                <span className="font-bold text-yellow-400">{totalCartPrice} د.إ</span>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setShowActiveItemControls(false);
+                                    setActiveMiniCartItem(null);
+                                    setShowCart(true);
+                                }}
+                                className="bg-green-500 hover:bg-green-600 text-white px-5 py-2 rounded-lg text-sm font-semibold"
+                            >
+                                عرض السلة
+                            </button>
+                        </div>
+                    </motion.div>
+                )}
             </div>
-        </motion.div>
+        </div>
     );
 };
 // Inside MainPanel.jsx
