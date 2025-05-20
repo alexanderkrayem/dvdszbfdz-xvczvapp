@@ -48,6 +48,11 @@ const [dealDetailError, setDealDetailError] = useState(null);
     const [isLoadingProducts, setIsLoadingProducts] = useState(false); // Track loading state
     const [productError, setProductError] = useState(null); // Track fetching errors
 
+    // Inside MainPanel component, with other useState hooks
+const [selectedSupplierDetails, setSelectedSupplierDetails] = useState(null);
+const [showSupplierDetailModal, setShowSupplierDetailModal] = useState(false);
+const [isLoadingSupplierDetail, setIsLoadingSupplierDetail] = useState(false);
+const [supplierDetailError, setSupplierDetailError] = useState(null);
 
     // --- NEW: Pagination state for products ---
 const [currentProductPage, setCurrentProductPage] = useState(1);
@@ -861,7 +866,33 @@ const proceedToCreateOrder = async () => {
         setIsPlacingOrder(false);
     }
 };
+// Inside MainPanel component
+const handleShowSupplierDetails = async (supplierId) => {
+    if (!supplierId) return;
 
+    console.log(`Fetching details for supplier ID: ${supplierId}`);
+    setShowSupplierDetailModal(true);
+    setIsLoadingSupplierDetail(true);
+    setSupplierDetailError(null);
+    setSelectedSupplierDetails(null);
+
+    try {
+        const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/suppliers/${supplierId}`;
+        const response = await fetch(apiUrl);
+
+        if (!response.ok) {
+            if (response.status === 404) throw new Error("المورد غير موجود.");
+            throw new Error(`فشل تحميل تفاصيل المورد: ${response.statusText}`);
+        }
+        const data = await response.json();
+        setSelectedSupplierDetails(data);
+    } catch (error) {
+        console.error("Error fetching supplier details:", error);
+        setSupplierDetailError(error.message);
+    } finally {
+        setIsLoadingSupplierDetail(false);
+    }
+};
 
   const renderCart = () => (
       <motion.div
@@ -965,117 +996,284 @@ const proceedToCreateOrder = async () => {
           )}
       </motion.div>
   );
-
 // Inside MainPanel component
-const renderProductDetailModal = () => {
-    if (!showProductDetailModal) return null;
+const renderSupplierDetailModal = () => {
+    if (!showSupplierDetailModal) return null;
 
-    const product = selectedProductDetails; // Use the fetched full details
+    const supplier = selectedSupplierDetails; // Full supplier details with .products array
+
+    // Helper to render a product card (simplified for this modal context)
+    // OR ideally, use your existing ProductCard component if it's flexible enough
+    const renderModalProductCard = (product) => (
+        <motion.div
+            key={`modal-prod-${product.id}`}
+            className="bg-white rounded-lg shadow-md overflow-hidden cursor-pointer flex flex-col"
+            whileHover={{ y: -3, boxShadow: '0 6px 12px -2px rgba(0,0,0,0.1)' }}
+            onClick={() => {
+                setShowSupplierDetailModal(false); // Close this modal
+                handleShowProductDetails(product.id); // Open product detail modal
+            }}
+        >
+            <div 
+                className="h-28 w-full bg-gray-200" // Adjusted height
+                style={product.image_url && product.image_url.startsWith('linear-gradient') ? 
+                       { background: product.image_url } : 
+                       { backgroundImage: `url(${product.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+            >
+                {/* Maybe a sale badge if product.is_on_sale */}
+            </div>
+            <div className="p-2.5">
+                <h4 className="font-semibold text-xs text-gray-800 line-clamp-2 mb-1 h-8">{product.name}</h4>
+                <div className="text-blue-600 font-bold text-sm">
+                    {parseFloat(product.is_on_sale && product.discount_price ? product.discount_price : product.price).toFixed(2)} د.إ
+                </div>
+            </div>
+        </motion.div>
+    );
+
 
     return (
         <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4 overflow-y-auto" // Added overflow-y-auto
+            key="supplierDetailModal"
+            initial={{ opacity: 0, x: "100vw" }} // Slide from right
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: "100vw" }} // Exit to right
+            transition={{ type: "spring", stiffness: 120, damping: 20 }}
+            className="fixed inset-0 bg-gray-100 z-50 flex flex-col overflow-y-auto" // Lighter background
             dir="rtl"
-            onClick={() => setShowProductDetailModal(false)} // Click outside to close
         >
-            <motion.div
-                initial={{ scale: 0.9, y: 20 }}
-                animate={{ scale: 1, y: 0 }}
-                exit={{ scale: 0.9, y: 20, opacity: 0 }}
-                transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                className="bg-white rounded-xl p-5 md:p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl" // Added max-h and overflow
-                onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside modal
-            >
-                {isLoadingProductDetail && (
-                    <div className="flex justify-center items-center min-h-[200px]">
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-white p-4 shadow-md z-10 flex justify-between items-center">
+                <h2 className="text-xl font-bold text-gray-800 truncate">
+                    {isLoadingSupplierDetail ? "جاري التحميل..." : (supplier ? supplier.name : "تفاصيل المورد")}
+                </h2>
+                <button onClick={() => setShowSupplierDetailModal(false)} className="text-gray-500 hover:text-gray-700 p-2">
+                    <X className="h-6 w-6" />
+                </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-grow"> {/* Let this part scroll */}
+                {isLoadingSupplierDetail && (
+                    <div className="flex justify-center items-center h-[calc(100vh-100px)]">
                         <p className="text-gray-500">جاري تحميل التفاصيل...</p>
-                        {/* Add a spinner icon here if desired */}
+                    </div>
+                )}
+                {supplierDetailError && !isLoadingSupplierDetail && (
+                    <div className="text-center py-10 h-[calc(100vh-100px)] flex flex-col justify-center items-center p-4">
+                        <p className="text-red-500 font-semibold text-lg">خطأ!</p>
+                        <p className="text-gray-600 mt-2">{supplierDetailError}</p>
+                        <button onClick={() => setShowSupplierDetailModal(false)} className="mt-6 bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300">إغلاق</button>
+                    </div>
+                )}
+                {!isLoadingSupplierDetail && !supplierDetailError && supplier && (
+                    <>
+                        {/* Supplier Banner/Image */}
+                        <div 
+                            className="w-full h-40 md:h-56 bg-gray-300 flex items-center justify-center text-white text-3xl font-bold"
+                            style={supplier.image_url && supplier.image_url.startsWith('linear-gradient') ? 
+                                   { background: supplier.image_url } : 
+                                   supplier.image_url ? 
+                                   { backgroundImage: `url(${supplier.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' } :
+                                   { background: 'linear-gradient(to right, #60a5fa, #3b82f6)' }} // Default gradient if no image
+                        >
+                            {!supplier.image_url && supplier.name.charAt(0)} {/* Show first letter if no image */}
+                        </div>
+                        
+                        <div className="p-4 md:p-6 space-y-5">
+                            {/* Basic Info */}
+                            <div className="pb-4 border-b">
+                                <h3 className="text-2xl font-bold text-gray-900">{supplier.name}</h3>
+                                {supplier.category && <p className="text-md text-blue-600">{supplier.category}</p>}
+                                <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
+                                    {supplier.location && <div className="flex items-center gap-1.5"><MapPin className="h-4 w-4 text-gray-500"/> {supplier.location}</div>}
+                                    {supplier.rating && <div className="flex items-center gap-1.5"><Star className="h-4 w-4 text-yellow-400 fill-current"/> {supplier.rating} نجوم</div>}
+                                </div>
+                            </div>
+
+                            {/* Description (if exists) */}
+                            {supplier.description && (
+                                <div className="prose prose-sm max-w-none"> {/* Use Tailwind Typography for nice text formatting */}
+                                    <h4 className="text-md font-semibold text-gray-700 mb-1">عن المورد:</h4>
+                                    <p>{supplier.description}</p>
+                                </div>
+                            )}
+
+                            {/* Products from this Supplier */}
+                            {supplier.products && supplier.products.length > 0 && (
+                                <div>
+                                    <h4 className="text-md font-semibold text-gray-700 mb-3">منتجات من هذا المورد ({supplier.totalProductsCount || supplier.products.length}):</h4>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                                        {supplier.products.map(prod => renderModalProductCard(prod))}
+                                    </div>
+                                    {supplier.hasMoreProducts && (
+                                        <div className="text-center mt-4">
+                                            <button 
+                                                onClick={() => {
+                                                     // --- START OF MODIFIED CODE ---
+                setShowSupplierDetailModal(false); // Close current supplier modal
+                
+                const supplierNameForSearch = supplier.name; // Get the supplier's name
+                
+                // Set the global search term to the supplier's name
+                // This will update the input field in the header
+                setSearchTerm(supplierNameForSearch); 
+                
+                // Manually trigger the debounced search.
+                // Your debouncedSearch function should handle the rest:
+                // - Checking term length
+                // - Setting loading states (isSearching)
+                // - Setting showSearchResultsView = true
+                // - Calling the API (/api/search?searchTerm=...)
+                // - Updating searchResults or searchError
+                debouncedSearch(supplierNameForSearch); 
+                // --- END OF MODIFIED CODE ---
+                                                }}
+                                                className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+                                            >
+                                                عرض كل المنتجات ({supplier.totalProductsCount})
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            {supplier.products && supplier.products.length === 0 && (
+                                <p className="text-sm text-gray-500">لا توجد منتجات معروضة من هذا المورد حالياً.</p>
+                            )}
+                        </div>
+                    </>
+                )}
+            </div>
+        </motion.div>
+    );
+};
+// Inside MainPanel component
+// Inside MainPanel.jsx
+const renderProductDetailModal = () => {
+    if (!showProductDetailModal) return null;
+
+    const product = selectedProductDetails;
+
+    return (
+        <motion.div
+            key="productDetailModal" // Good practice for AnimatePresence
+            initial={{ opacity: 0, y: "100vh" }} // Start from bottom of screen (or x: "100vw" for slide from right)
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: "100vh" }}   // Exit to bottom (or x: "100vw")
+            transition={{ type: "spring", stiffness: 120, damping: 20 }}
+            // Full screen styles:
+            className="fixed inset-0 bg-white z-50 flex flex-col overflow-y-auto" // Changed background, removed centering
+            dir="rtl"
+        >
+            {/* Modal Header (Fixed or part of scroll) */}
+            <div className="sticky top-0 bg-white p-4 shadow-md z-10 flex justify-between items-center">
+                <h2 className="text-xl font-bold text-gray-800 truncate">
+                    {isLoadingProductDetail ? "جاري التحميل..." : (product ? product.name : "تفاصيل المنتج")}
+                </h2>
+                <button 
+                    onClick={() => setShowProductDetailModal(false)} 
+                    className="text-gray-500 hover:text-gray-700 p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-gray-400" // Added focus style
+                >
+                    <X className="h-6 w-6" />
+                </button>
+            </div>
+
+            {/* Modal Content - takes remaining space and scrolls */}
+            <div className="flex-grow p-4 md:p-6"> {/* flex-grow allows this div to take available space */}
+                {isLoadingProductDetail && (
+                    <div className="flex justify-center items-center h-[calc(100vh-100px)]"> {/* Adjust height based on header */}
+                        <p className="text-gray-500">جاري تحميل التفاصيل...</p>
                     </div>
                 )}
                 {productDetailError && !isLoadingProductDetail && (
-                    <div className="text-center py-10">
-                        <p className="text-red-500 font-semibold">خطأ!</p>
+                    <div className="text-center py-10 h-[calc(100vh-100px)] flex flex-col justify-center items-center">
+                        <p className="text-red-500 font-semibold text-lg">خطأ!</p>
                         <p className="text-gray-600 mt-2">{productDetailError}</p>
                         <button
                             onClick={() => setShowProductDetailModal(false)}
-                            className="mt-4 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300"
+                            className="mt-6 bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300"
                         >
                             إغلاق
                         </button>
                     </div>
                 )}
                 {!isLoadingProductDetail && !productDetailError && product && (
-                    <>
-                        <div className="flex justify-between items-start mb-4">
-                            <h2 className="inline-block bg-blue-100 text-blue-700 text-xl md:text-2xl font-bold px-4 py-2 rounded-lg">{product.name}</h2>
-                            <button onClick={() => setShowProductDetailModal(false)} className="text-gray-400 hover:text-gray-600">
-                                <X className="h-7 w-7" />
+                    // Using a single column layout for simplicity, can be grid for wider screens
+                    <div className="space-y-6">
+                        {/* Image Section */}
+                        <div 
+                            className="w-full h-64 sm:h-72 md:h-80 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden shadow"
+                            style={product.image_url && product.image_url.startsWith('linear-gradient') ? 
+                                   { background: product.image_url } : 
+                                   {}} // Apply gradient to div directly
+                        >
+                            {product.image_url && !product.image_url.startsWith('linear-gradient') ? (
+                                <img src={product.image_url} alt={product.name} className="w-full h-full object-contain md:object-cover"/> // object-contain to see full image
+                            ) : !product.image_url ? (
+                                <span className="inline-block bg-gray-200 text-gray-600 text-sm font-medium px-4 py-2 rounded-md">
+                                    لا توجد صورة
+                                </span>
+                            ) : null /* Gradient handled by parent div style */}
+                        </div>
+
+                        {/* Details Section */}
+                        <div className="space-y-3">
+                            {/* Styled Product Name (already done, ensure it's here) */}
+                             <h1 className="inline-block bg-indigo-100 text-indigo-700 text-2xl md:text-3xl font-bold px-4 py-2 rounded-lg shadow-sm">
+                                {product.name}
+                            </h1>
+                            
+                            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                                {product.is_on_sale && product.discount_price && (
+                                    <p className="text-xl text-gray-500 line-through">
+                                        {parseFloat(product.price).toFixed(2)} د.إ
+                                    </p>
+                                )}
+                                <p className="text-4xl font-extrabold text-blue-600">
+                                    {parseFloat(product.is_on_sale && product.discount_price ? product.discount_price : product.price).toFixed(2)} د.إ
+                                </p>
+                            </div>
+
+                            {product.category && <p className="text-md text-gray-600"><span className="font-medium">الفئة:</span> {product.category}</p>}
+                            {product.supplier_name && <p className="text-md text-gray-600"><span className="font-medium">المورد:</span> <span className="text-blue-600">{product.supplier_name}</span></p>}
+                            
+                            {product.stock_level !== null && product.stock_level > 0 && <p className="text-sm text-green-600 font-medium">متوفر ({product.stock_level} قطعة)</p>}
+                            {product.stock_level !== null && product.stock_level === 0 && <p className="text-sm text-red-500 font-medium">نفذت الكمية</p>}
+                        </div>
+                        
+                        {/* Description */}
+                        {product.description && (
+                            <div className="border-t pt-4">
+                                <h4 className="text-lg font-semibold text-gray-700 mb-2">الوصف:</h4>
+                                <div className="prose prose-sm max-w-none text-gray-700 leading-relaxed">
+                                    <p>{product.description}</p> {/* Ensure prose styles apply */}
+                                _</div>
+                            </div>
+                        )}
+                        
+                        {/* TODO: Add features list here if available from product data */}
+
+                        {/* Action Buttons (Footer of content, or could be sticky footer for modal) */}
+                        <div className="pt-6 border-t flex items-center gap-3">
+                            <button
+                                onClick={() => addToCart(product)}
+                                disabled={product.stock_level === 0}
+                                className="flex-grow bg-blue-500 text-white py-3.5 px-6 rounded-lg font-semibold hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-lg"
+                            >
+                                <ShoppingCart className="h-5 w-5" />
+                                إضافة للسلة
+                            </button>
+                            <button
+                                onClick={() => handleToggleFavorite(product.id)}
+                                className="p-3.5 border border-gray-300 rounded-lg text-gray-600 hover:border-red-500 hover:text-red-500 focus:outline-none focus:ring-2 focus:ring-red-300 transition-colors"
+                                aria-label="Toggle Favorite"
+                            >
+                                <Heart className={`h-6 w-6 ${userFavoriteProductIds.has(product.id) ? 'text-red-500 fill-red-500' : ''}`} />
                             </button>
                         </div>
-
-                        <div className="grid md:grid-cols-2 gap-6">
-                            {/* Image Section */}
-                            <div className="w-full h-64 md:h-auto bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
-                                {product.image_url ? (
-                                    <img src={product.image_url.startsWith('linear-gradient') ? undefined : product.image_url} // Don't use img src for gradients
-                                         style={product.image_url.startsWith('linear-gradient') ? { background: product.image_url, width: '100%', height: '100%', color: 'transparent' } : {}}
-                                         alt={product.name}
-                                         className="w-full h-full object-cover"
-                                    />
-                                ) : (
-                                    <span className="text-gray-400">لا توجد صورة</span>
-                                )}
-                            </div>
-
-                            {/* Details Section */}
-                            <div className="flex flex-col justify-between">
-                                <div>
-                                    {product.category && <p className="text-sm text-gray-500 mb-1">الفئة: {product.category}</p>}
-                                    {product.supplier_name && <p className="text-sm text-blue-600 mb-3">المورد: {product.supplier_name}</p>}
-
-                                    <p className="text-gray-700 mb-4 leading-relaxed">{product.description || "لا يوجد وصف متاح."}</p>
-
-                                    {product.is_on_sale && product.discount_price && (
-                                        <p className="text-lg text-gray-500 line-through mb-1">
-                                            {parseFloat(product.price).toFixed(2)} د.إ
-                                        </p>
-                                    )}
-                                    <p className="text-3xl font-extrabold text-blue-600 mb-4">
-                                        {parseFloat(product.is_on_sale && product.discount_price ? product.discount_price : product.price).toFixed(2)} د.إ
-                                    </p>
-                                    {product.stock_level !== null && product.stock_level > 0 && <p className="text-sm text-green-600 mb-1">متوفر ({product.stock_level} قطعة)</p>}
-                                    {product.stock_level !== null && product.stock_level === 0 && <p className="text-sm text-red-500 mb-1">نفذت الكمية</p>}
-                                </div>
-
-                                {/* Action Buttons */}
-                                <div className="mt-6 flex items-center gap-3">
-                                    <button
-                                        onClick={() => {
-                                            addToCart(product); // Ensure addToCart can handle this product structure
-                                            // setShowProductDetailModal(false); // Optionally close modal after adding
-                                        }}
-                                        disabled={product.stock_level === 0}
-                                        className="flex-grow bg-blue-500 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                                    >
-                                        <ShoppingCart className="h-5 w-5" />
-                                        إضافة للسلة
-                                    </button>
-                                    <button
-                                        onClick={() => handleToggleFavorite(product.id)}
-                                        className="p-3 border border-gray-300 rounded-lg text-gray-600 hover:border-red-500 hover:text-red-500 transition-colors"
-                                        aria-label="Toggle Favorite"
-                                    >
-                                        <Heart className={`h-5 w-5 ${userFavoriteProductIds.has(product.id) ? 'text-red-500 fill-red-500' : ''}`} />
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </>
+                    </div>
                 )}
-            </motion.div>
+            </div>
         </motion.div>
     );
 };
@@ -1434,7 +1632,7 @@ const renderDealDetailModal = () => {
                                             {searchResults.suppliers.map(supplier => (
                                                 // **YOUR ACTUAL SUPPLIER CARD COMPONENT/JSX HERE**
                                                 // Example: <SupplierCard key={supplier.id} supplier={supplier} />
-                                                <motion.div key={`search-supp-${supplier.id}`} className="bg-white rounded-xl shadow-md overflow-hidden cursor-pointer" whileHover={{ scale: 1.02 }}>
+                                                <motion.div key={`search-supp-${supplier.id}`} className="bg-white rounded-xl shadow-md overflow-hidden cursor-pointer" whileHover={{ scale: 1.02 }} onClick={() => handleShowSupplierDetails(supplier.id)}>
                                                     <div className="h-24 w-full flex items-center justify-center text-white" style={{ background: supplier.image_url || 'linear-gradient(to right, #3b82f6, #1d4ed8)' }}><h4 className="text-lg font-bold">{supplier.name}</h4></div>
                                                     <div className="p-4">
                                                         <div className="flex items-center justify-between mb-2 text-sm"><span className="text-gray-600">{supplier.category || 'غير مصنف'}</span>{supplier.rating && (<div className="flex items-center gap-1"><Star className="h-4 w-4 text-yellow-400 fill-current"/><span>{supplier.rating}</span></div>)}</div>
@@ -1518,12 +1716,12 @@ const renderDealDetailModal = () => {
                     {activeSection === 'suppliers' && (
                         <div className="space-y-4"> {/* Your Suppliers Tab Content */}
                              <h2 className="text-xl font-bold mb-4 text-gray-800">الموردون المشاركون</h2>
-                             {isLoadingSuppliers && <p className="text-center">Loading suppliers...</p>}
+                             {isLoadingSuppliers && <p className="text-center">جاري تحميل الموردين...</p>}
                              {supplierError && <p className="text-center text-red-500">{supplierError}</p>}
                              {!isLoadingSuppliers && !supplierError && fetchedSuppliers.length === 0 && <p className="text-center">No suppliers available.</p>}
                              {!isLoadingSuppliers && !supplierError && fetchedSuppliers.map(supplier => (
                                 // Your Supplier Card for the Suppliers Tab
-                                <motion.div key={`tab-supp-${supplier.id}`} className="bg-white rounded-xl shadow-md overflow-hidden cursor-pointer" whileHover={{ scale: 1.02 }}>
+                                <motion.div key={`tab-supp-${supplier.id}`} className="bg-white rounded-xl shadow-md overflow-hidden cursor-pointer" whileHover={{ scale: 1.02 }} onClick={() => handleShowSupplierDetails(supplier.id)}>
                                     <div className="h-24 w-full flex items-center justify-center text-white" style={{ background: supplier.image_url || 'linear-gradient(to right, #3b82f6, #1d4ed8)' }}><h3 className="text-lg font-bold">{supplier.name}</h3></div>
                                     <div className="p-4">
                                          <div className="flex items-center justify-between mb-2 text-sm"><span className="text-gray-600">{supplier.category || 'غير مصنف'}</span>{supplier.rating && (<div className="flex items-center gap-1"><Star className="h-4 w-4 text-yellow-400 fill-current"/><span>{supplier.rating}</span></div>)}</div>
@@ -1760,6 +1958,13 @@ const renderDealDetailModal = () => {
     {showProductDetailModal && renderProductDetailModal()}
     {showDealDetailModal && renderDealDetailModal()}
     {/* other modals with their show state */}
+</AnimatePresence>
+
+{/* --- NEW: Render Supplier Detail Modal --- */}
+    {renderSupplierDetailModal()} 
+
+    <AnimatePresence>
+    {showSupplierDetailModal && renderSupplierDetailModal()}
 </AnimatePresence>
 
     </div>
