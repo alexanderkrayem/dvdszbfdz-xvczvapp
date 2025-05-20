@@ -77,6 +77,9 @@ const PRODUCTS_PER_PAGE = 12; // Or 20, or whatever you prefer as a default limi
 // Inside MainPanel component
 const [userFavoriteProductIds, setUserFavoriteProductIds] = useState(new Set()); // Use a Set for efficient lookups
 const [isLoadingFavorites, setIsLoadingFavorites] = useState(false);
+// Inside MainPanel component - you should already have these from checkout implementation
+const [isCheckingOut, setIsCheckingOut] = useState(false); // Overall checkout process loading
+const [isCreatingOrder, setIsCreatingOrder] = useState(false); // Specific loading for order creation
 // Inside MainPanel component, with other useState hooks
 const [showOrderConfirmationModal, setShowOrderConfirmationModal] = useState(false);
 const [confirmedOrderDetails, setConfirmedOrderDetails] = useState(null); // To store { orderId: ... }
