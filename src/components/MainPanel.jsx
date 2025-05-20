@@ -1,7 +1,7 @@
 // src/components/MainPanel.jsx
 
 import React, { useState, useEffect, useCallback     } from 'react'; // Ensure useEffect is imported
-import { Clock, MapPin, Plus, Minus, Trash2, Star, ShoppingCart, Search, X, Heart, TagIcon } from 'lucide-react';
+import { Clock, MapPin, Plus, Minus, Trash2, Star, ShoppingCart, Search, X, Heart, TagIcon, ChevronLeftIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const MainPanel = ({ telegramUser }) => {
@@ -38,6 +38,11 @@ const [showSearchResultsView, setShowSearchResultsView] = useState(false); // To
 const [fetchedOrders, setFetchedOrders] = useState([]);
 const [isLoadingOrdersTab, setIsLoadingOrdersTab] = useState(false);
 const [ordersTabError, setOrdersTabError] = useState(null);
+// Inside MainPanel component, with other useState hooks
+const [selectedDealDetails, setSelectedDealDetails] = useState(null);
+const [showDealDetailModal, setShowDealDetailModal] = useState(false);
+const [isLoadingDealDetail, setIsLoadingDealDetail] = useState(false);
+const [dealDetailError, setDealDetailError] = useState(null);
     // --- State for fetched product data ---
     const [fetchedProducts, setFetchedProducts] = useState([]); // To store products from API
     const [isLoadingProducts, setIsLoadingProducts] = useState(false); // Track loading state
@@ -785,7 +790,33 @@ const handleSaveProfile = async (e) => {
         setIsPlacingOrder(false); // Or setIsLoadingProfile(false)
     }
 };
+// Inside MainPanel component
+const handleShowDealDetails = async (dealId) => {
+    if (!dealId) return;
 
+    console.log(`Fetching details for deal ID: ${dealId}`);
+    setShowDealDetailModal(true);
+    setIsLoadingDealDetail(true);
+    setDealDetailError(null);
+    setSelectedDealDetails(null);
+
+    try {
+        const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/deals/${dealId}`;
+        const response = await fetch(apiUrl);
+
+        if (!response.ok) {
+            if (response.status === 404) throw new Error("العرض غير موجود أو لم يعد فعالاً.");
+            throw new Error(`فشل تحميل تفاصيل العرض: ${response.statusText}`);
+        }
+        const data = await response.json();
+        setSelectedDealDetails(data);
+    } catch (error) {
+        console.error("Error fetching deal details:", error);
+        setDealDetailError(error.message);
+    } finally {
+        setIsLoadingDealDetail(false);
+    }
+};
 const proceedToCreateOrder = async () => {
     if (!telegramUser?.id) {
         alert("Cannot create order: User information missing.");
@@ -1089,7 +1120,149 @@ const renderMiniCartBar = () => {
     );
 };
 
+// Inside MainPanel component
+const renderDealDetailModal = () => {
+    if (!showDealDetailModal) return null;
 
+    const deal = selectedDealDetails;
+
+    return (
+        <motion.div
+            key="dealDetailModal" // Add a key for AnimatePresence if used around the call
+            initial={{ opacity: 0, y: "100vh" }} // Start from bottom of screen
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: "100vh" }} // Exit to bottom
+            transition={{ type: "spring", stiffness: 120, damping: 20 }}
+            // Full screen styles:
+            className="fixed inset-0 bg-white z-50 flex flex-col overflow-y-auto"
+            dir="rtl"
+        >
+            {/* Modal Header (Fixed or part of scroll) */}
+            <div className="sticky top-0 bg-white p-4 shadow-md z-10 flex justify-between items-center">
+                <h2 className="text-xl font-bold text-gray-800 truncate">
+                    {isLoadingDealDetail ? "جاري التحميل..." : (deal ? deal.title : "تفاصيل العرض")}
+                </h2>
+                <button onClick={() => setShowDealDetailModal(false)} className="text-gray-500 hover:text-gray-700 p-2">
+                    <X className="h-6 w-6" />
+                </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-grow p-4 md:p-6">
+                {isLoadingDealDetail && (
+                    <div className="flex justify-center items-center h-[calc(100vh-100px)]"> {/* Adjust height based on header */}
+                        <p className="text-gray-500">جاري تحميل التفاصيل...</p>
+                    </div>
+                )}
+                {dealDetailError && !isLoadingDealDetail && (
+                    <div className="text-center py-10 h-[calc(100vh-100px)] flex flex-col justify-center items-center">
+                        <p className="text-red-500 font-semibold text-lg">خطأ!</p>
+                        <p className="text-gray-600 mt-2">{dealDetailError}</p>
+                        <button
+                            onClick={() => setShowDealDetailModal(false)}
+                            className="mt-6 bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300"
+                        >
+                            إغلاق
+                        </button>
+                    </div>
+                )}
+                {!isLoadingDealDetail && !dealDetailError && deal && (
+                    <div className="space-y-6">
+                        {/* Deal Image/Banner */}
+                        <div 
+                            className="w-full h-48 md:h-64 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden"
+                            style={deal.image_url && deal.image_url.startsWith('linear-gradient') ? { background: deal.image_url } : {}}
+                        >
+                            {deal.image_url && !deal.image_url.startsWith('linear-gradient') ? (
+                                <img src={deal.image_url} alt={deal.title} className="w-full h-full object-cover"/>
+                            ) : !deal.image_url && ( // Only show this if no image_url and not a gradient
+                                <span className="text-gray-400">لا توجد صورة للعرض</span>
+                            )}
+                            {/* If it's a gradient, the background is applied to the div, nothing else needed here */}
+                        </div>
+
+                        {/* Deal Info */}
+                        <div>
+                            {deal.discount_percentage && (
+                                <p className="text-3xl font-extrabold text-red-600 mb-2">
+                                    خصم {deal.discount_percentage}%
+                                </p>
+                            )}
+                            <p className="text-gray-700 leading-relaxed mb-4">{deal.description || "لا توجد تفاصيل إضافية لهذا العرض."}</p>
+                            
+                            <div className="text-sm text-gray-600 space-y-1">
+                                {deal.start_date && (
+                                    <p>يبدأ في: <span className="font-medium">{new Date(deal.start_date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}</span></p>
+                                )}
+                                {deal.end_date && (
+                                    <p>ينتهي في: <span className="font-medium">{new Date(deal.end_date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}</span></p>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Linked Product Info (if any) */}
+                        {deal.product_id && deal.product_name && (
+                            <div className="border-t pt-4">
+                                <h4 className="text-md font-semibold text-gray-700 mb-2">المنتج المرتبط بالعرض:</h4>
+                                <div 
+                                    className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100"
+                                    onClick={() => {
+                                        setShowDealDetailModal(false); // Close this modal
+                                        handleShowProductDetails(deal.product_id); // Open product detail modal
+                                    }}
+                                >
+                                    {deal.product_image_url && (
+                                        <img 
+                                            src={deal.product_image_url.startsWith('linear-gradient') ? undefined : deal.product_image_url}
+                                            style={deal.product_image_url.startsWith('linear-gradient') ? { background: deal.product_image_url, width: '48px', height: '48px', borderRadius: '0.25rem' } : {width: '48px', height: '48px', borderRadius: '0.25rem', objectFit: 'cover'}}
+                                            alt={deal.product_name}
+                                            className="w-12 h-12 rounded object-cover flex-shrink-0"
+                                        />
+                                    )}
+                                    {/* Product Name and Price Info */}
+            <div className="flex-grow">
+                <p className="font-semibold text-blue-700 hover:text-blue-800 text-base mb-1">{deal.product_name}</p>
+                
+                {/* Display product price information if available */}
+                {(typeof deal.product_price !== 'undefined') && ( // Check if price info is present
+                    <div className="text-xs">
+                        {deal.product_is_on_sale && deal.product_discount_price && (
+                            <span className="text-gray-500 line-through mr-1.5">
+                                {parseFloat(deal.product_price).toFixed(2)} د.إ
+                            </span>
+                        )}
+                        <span className="font-bold text-gray-700">
+                            {parseFloat(
+                                deal.product_is_on_sale && deal.product_discount_price 
+                                ? deal.product_discount_price 
+                                : deal.product_price
+                            ).toFixed(2)} د.إ
+                        </span>
+                        {/* You could also add a small "View Product Details" text/icon here if the whole block isn't clickable enough */}
+                    </div>
+                )}
+            </div>
+            {/* Optional: Arrow or indicator for clickability */}
+            <ChevronLeftIcon className="h-5 w-5 text-gray-400 hidden sm:block flex-shrink-0" /> {/* For LTR, use ChevronRightIcon. Adjust for RTL or use a generic "view" icon */}
+    
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Linked Supplier Info (if any) */}
+                        {deal.supplier_id && deal.supplier_name && (
+                            <div className="border-t pt-4">
+                                <h4 className="text-md font-semibold text-gray-700 mb-2">مقدم من المورد:</h4>
+                                {/* TODO: Later, make this clickable to open supplier detail modal */}
+                                <p className="p-3 bg-gray-50 rounded-lg text-blue-600 font-medium">{deal.supplier_name}</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+        </motion.div>
+    );
+};
     return (
     <div className="min-h-screen bg-gray-50" dir="rtl">
         {/* Header */}
@@ -1239,7 +1412,7 @@ const renderMiniCartBar = () => {
                                             {searchResults.deals.map(deal => (
                                                 // **YOUR ACTUAL DEAL CARD COMPONENT/JSX HERE**
                                                 // Example: <DealCard key={deal.id} deal={deal} />
-                                                <motion.div key={`search-deal-${deal.id}`} className="bg-white rounded-xl shadow-md overflow-hidden" whileHover={{ scale: 1.02 }}>
+                                                <motion.div key={`search-deal-${deal.id}`} className="bg-white rounded-xl shadow-md overflow-hidden" whileHover={{ scale: 1.02 }} onClick={() => handleShowDealDetails(deal.id)}>
                                                     <div className="h-36 w-full flex items-center justify-center text-white p-4" style={{ background: deal.image_url || 'linear-gradient(to right, #f59e0b, #d97706)' }}>
                                                         <div className="text-center">
                                                           <div className="text-3xl font-bold mb-1">{deal.discount_percentage ? `خصم ${deal.discount_percentage}%` : 'عرض خاص'}</div>
@@ -1288,7 +1461,7 @@ const renderMiniCartBar = () => {
                             {!isLoadingDeals && !dealError && fetchedDeals.length === 0 && <p className="text-center">No deals available.</p>}
                             {!isLoadingDeals && !dealError && fetchedDeals.map(deal => (
                                 // Your Deal Card for the Deals Tab
-                                <motion.div key={`tab-deal-${deal.id}`} className="bg-white rounded-xl shadow-md overflow-hidden" whileHover={{ scale: 1.02 }}>
+                                <motion.div key={`tab-deal-${deal.id}`} className="bg-white rounded-xl shadow-md overflow-hidden" whileHover={{ scale: 1.02 }}  onClick={() => handleShowDealDetails(deal.id)}>
                                     <div className="h-36 w-full flex items-center justify-center text-white p-4" style={{ background: deal.image_url || 'linear-gradient(to right, #f59e0b, #d97706)' }}>
                                          <div className="text-center">
                                             <div className="text-3xl font-bold mb-1">{deal.discount_percentage ? `خصم ${deal.discount_percentage}%` : 'عرض خاص'}</div>
@@ -1579,6 +1752,15 @@ const renderMiniCartBar = () => {
         
 {/* --- ADD THIS LINE IF IT'S MISSING --- */}
             {renderProductDetailModal()} 
+
+ {/* --- NEW: Render Deal Detail Modal --- */}
+    {renderDealDetailModal()}
+
+    <AnimatePresence>
+    {showProductDetailModal && renderProductDetailModal()}
+    {showDealDetailModal && renderDealDetailModal()}
+    {/* other modals with their show state */}
+</AnimatePresence>
 
     </div>
 )};
