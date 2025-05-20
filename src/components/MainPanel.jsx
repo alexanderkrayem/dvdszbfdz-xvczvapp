@@ -1,7 +1,7 @@
 // src/components/MainPanel.jsx
 
 import React, { useState, useEffect, useCallback     } from 'react'; // Ensure useEffect is imported
-import { Clock, MapPin, Plus, Minus, Trash2, Star, ShoppingCart, Search, X, Heart, TagIcon, ChevronLeftIcon } from 'lucide-react';
+import { Clock, MapPin, Plus, Minus, Trash2, Star, ShoppingCart, Search, X, Heart, TagIcon, ChevronLeftIcon, CheckCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const MainPanel = ({ telegramUser }) => {
@@ -75,7 +75,9 @@ const PRODUCTS_PER_PAGE = 12; // Or 20, or whatever you prefer as a default limi
 // Inside MainPanel component
 const [userFavoriteProductIds, setUserFavoriteProductIds] = useState(new Set()); // Use a Set for efficient lookups
 const [isLoadingFavorites, setIsLoadingFavorites] = useState(false);
-
+// Inside MainPanel component, with other useState hooks
+const [showOrderConfirmationModal, setShowOrderConfirmationModal] = useState(false);
+const [confirmedOrderDetails, setConfirmedOrderDetails] = useState(null); // To store { orderId: ... }
     // Address Form State (inside MainPanel or a new AddressFormModal component)
     const [addressFormData, setAddressFormData] = useState({
         fullName: '',
@@ -852,8 +854,11 @@ const proceedToCreateOrder = async () => {
         const orderResult = await response.json();
         console.log("Order created:", orderResult);
 
-        alert(`تم إنشاء طلبك بنجاح! رقم الطلب: ${orderResult.orderId}. سنتواصل معك قريباً.`); // Success message
-        setCartItems([]); // Clear the cart on the frontend
+        setConfirmedOrderDetails(orderResult); // Store order details for the modal
+setShowOrderConfirmationModal(true);  // Show the confirmation modal
+
+setCartItems([]);       // Clear the cart in the UI
+setShowCart(false);     // Close the cart sidebar
         // Optionally, close the Mini App or navigate to a success page
         // if (window.Telegram?.WebApp) {
         //     window.Telegram.WebApp.close();
@@ -1313,6 +1318,71 @@ const renderMiniCartBar = () => {
                 >
                     عرض السلة
                 </button>
+            </div>
+        </motion.div>
+    );
+};
+// Inside MainPanel.jsx
+const renderOrderConfirmationModal = () => {
+    if (!showOrderConfirmationModal || !confirmedOrderDetails) return null;
+
+    return (
+        <motion.div
+            key="orderConfirmationModal"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{ type: "spring", stiffness: 200, damping: 20 }}
+            // Full screen, but content centered
+            className="fixed inset-0 bg-green-500 z-50 flex flex-col items-center justify-center p-4 text-white" 
+            dir="rtl"
+        >
+            <div className="text-center space-y-6 max-w-md">
+                {/* Success Icon */}
+                <motion.div 
+                    initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.2, type: "spring", stiffness: 150 }}
+                    className="mx-auto bg-white rounded-full h-20 w-20 flex items-center justify-center shadow-lg"
+                >
+                    <CheckCircle className="h-12 w-12 text-green-500" /> {/* lucide-react icon */}
+                </motion.div>
+
+                <motion.h2 
+                    initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.3 }}
+                    className="text-3xl font-bold"
+                >
+                    تم استلام طلبك بنجاح!
+                </motion.h2>
+                
+                <motion.p 
+                    initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.4 }}
+                    className="text-lg"
+                >
+                    رقم طلبك هو: <span className="font-bold text-yellow-300">#{confirmedOrderDetails.orderId}</span>
+                </motion.p>
+
+                <motion.p 
+                    initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.5 }}
+                    className="text-md"
+                >
+                    سنتواصل معك قريباً لتأكيد تفاصيل التوصيل واستلام المبلغ. يمكنك متابعة حالة طلبك من قسم "طلباتي".
+                </motion.p>
+
+                <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.6 }}>
+                    <button
+                        onClick={() => {
+                            setShowOrderConfirmationModal(false);
+                            setConfirmedOrderDetails(null);
+                            // Optional: Navigate to 'My Orders' tab or close app
+                            // setActiveSection('orders'); 
+                            if (window.Telegram?.WebApp) {
+                                 window.Telegram.WebApp.close(); // Or just keep app open
+                            }
+                        }}
+                        className="mt-8 bg-white text-green-600 font-semibold px-8 py-3 rounded-lg shadow-md hover:bg-gray-100 transition-colors text-lg"
+                    >
+                        حسنًا، فهمت!
+                    </button>
+                </motion.div>
             </div>
         </motion.div>
     );
@@ -1966,6 +2036,11 @@ const renderDealDetailModal = () => {
     <AnimatePresence>
     {showSupplierDetailModal && renderSupplierDetailModal()}
 </AnimatePresence>
+
+ {/* --- NEW: Render Order Confirmation Modal --- */}
+    <AnimatePresence>
+        {showOrderConfirmationModal && renderOrderConfirmationModal()}
+    </AnimatePresence>
 
     </div>
 )};
