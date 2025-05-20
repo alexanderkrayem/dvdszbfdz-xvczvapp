@@ -1299,9 +1299,10 @@ const renderProductDetailModal = () => {
   // --- NEW: Function to render the Mini Cart Summary Bar ---
 // Inside MainPanel.jsx
 
+// Inside MainPanel.jsx
+
 const renderMiniCartBar = () => {
-    // Don't show mini bar OR active controls if full cart is open OR if currently checking out
-    if (showCart || isCheckingOut || isCreatingOrder) return null; 
+    if (showCart || isCheckingOut || isCreatingOrder) return null;
 
     let totalCartPrice = "0.00";
     let totalCartItems = 0;
@@ -1320,7 +1321,6 @@ const renderMiniCartBar = () => {
         const displayItem = currentItemInCart || activeMiniCartItem;
 
         if (!displayItem || typeof displayItem.quantity === 'undefined' || displayItem.quantity === 0) {
-            // If quantity is 0 after an update, it means it was removed, so hide controls
             if (displayItem.quantity === 0 && showActiveItemControls){
                  setShowActiveItemControls(false);
                  setActiveMiniCartItem(null);
@@ -1331,73 +1331,72 @@ const renderMiniCartBar = () => {
         return (
             <motion.div
                 key={`active-item-${displayItem.product_id}`}
-                initial={{ opacity: 0, y: 20 }} // Slightly different animation
+                initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 20 }}
-                transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-                className="relative bg-white p-3 shadow-xl rounded-t-lg border-b border-gray-200 w-full" // Ensure it takes full width of its container
+                exit={{ opacity: 0, y: 30, transition: { duration: 0.2 } }}
+                transition={{ type: 'spring', stiffness: 280, damping: 25 }}
+                // STYLES FOR ACTIVE ITEM CONTROLS
+                className="relative bg-white p-3.5 shadow-lg rounded-t-xl border-b border-gray-200 w-full" 
             >
                 <button
                     onClick={() => {
                         setShowActiveItemControls(false);
                         setActiveMiniCartItem(null);
                     }}
-                    className="absolute top-2 left-2 p-1 text-gray-400 hover:text-gray-600 rounded-full bg-gray-50 hover:bg-gray-100 z-10"
+                    className="absolute top-2.5 left-2.5 p-1 text-gray-400 hover:text-gray-700 rounded-full hover:bg-gray-100 transition-colors"
                     aria-label="Close active item controls"
                 >
-                    <X className="h-3.5 w-3.5" />
+                    <X className="h-4 w-4" /> {/* Slightly larger X icon */}
                 </button>
 
-                <div className="flex items-center justify-between gap-3 pl-6"> {/* Adjusted padding for RTL: pl-6 if X is on left */}
-                    <div className="flex items-center gap-2 flex-grow min-w-0"> {/* min-w-0 for truncate */}
+                <div className="flex items-center justify-between gap-3 pl-8"> {/* Increased padding for X button */}
+                    <div className="flex items-center gap-3 flex-grow min-w-0"> {/* Increased gap */}
                         {displayItem.image_url && (
                              <div 
-                                className="w-10 h-10 rounded bg-gray-200 flex-shrink-0"
+                                className="w-12 h-12 rounded-md bg-gray-200 flex-shrink-0" // Larger image
                                 style={displayItem.image_url.startsWith('linear-gradient') ? 
                                        { background: displayItem.image_url } : 
                                        { backgroundImage: `url(${displayItem.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
                             ></div>
                         )}
-                        <span className="text-xs font-medium text-gray-700 truncate">{displayItem.name}</span>
+                        <span className="text-sm font-medium text-gray-800 truncate">{displayItem.name}</span> {/* Darker text */}
                     </div>
 
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                        <button onClick={() => handleDecreaseQuantity(displayItem.product_id)} className="p-1.5 bg-gray-100 rounded-md hover:bg-gray-200"><Minus className="h-3.5 w-3.5 text-gray-700"/></button>
-                        <span className="text-sm font-semibold w-6 text-center tabular-nums">{displayItem.quantity}</span>
-                        <button onClick={() => handleIncreaseQuantity(displayItem.product_id)} className="p-1.5 bg-gray-100 rounded-md hover:bg-gray-200"><Plus className="h-3.5 w-3.5 text-gray-700"/></button>
-                        <button onClick={() => handleRemoveItem(displayItem.product_id)} className="p-1.5 text-red-500 hover:text-red-700 rounded-md hover:bg-red-50"><Trash2 className="h-4 w-4"/></button>
+                    <div className="flex items-center gap-2 flex-shrink-0"> {/* Increased gap */}
+                        <button onClick={() => handleDecreaseQuantity(displayItem.product_id)} className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"><Minus className="h-4 w-4 text-gray-700"/></button>
+                        <span className="text-md font-semibold w-7 text-center tabular-nums text-gray-800">{displayItem.quantity}</span> {/* Larger quantity text */}
+                        <button onClick={() => handleIncreaseQuantity(displayItem.product_id)} className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"><Plus className="h-4 w-4 text-gray-700"/></button>
+                        <button onClick={() => handleRemoveItem(displayItem.product_id)} className="p-2 text-red-500 hover:text-red-700 rounded-lg hover:bg-red-50 transition-colors"><Trash2 className="h-4.5 w-4.5"/></button> {/* Slightly larger trash icon */}
                     </div>
                 </div>
             </motion.div>
         );
     };
 
-    if (cartItems.length === 0 && !showActiveItemControls) { // If cart empty and no active item to show, render nothing
+    if (cartItems.length === 0 && !showActiveItemControls) {
         return null;
     }
     
-    // If only active item controls are shown (cart became empty but controls are still up)
-    // Or if both cart summary and active controls are shown.
     return (
-        <div className="fixed bottom-0 left-0 right-0 z-40 flex flex-col items-center" dir="rtl"> {/* Centering the bar container */}
-            <div className="w-full max-w-4xl px-2 sm:px-0"> {/* Max width like main content, with padding for small screens */}
+        <div className="fixed bottom-0 left-0 right-0 z-40 flex flex-col items-center" dir="rtl">
+            <div className="w-full max-w-4xl px-3 sm:px-4 pb-2 sm:pb-3"> {/* Add some padding around the bar(s) */}
                 <AnimatePresence>
                     {showActiveItemControls && activeMiniCartItem && renderActiveItemControls()}
                 </AnimatePresence>
                 
-                {cartItems.length > 0 && ( // Only show the summary bar if there are items actually in the cart
+                {cartItems.length > 0 && (
                     <motion.div
-                        initial={showActiveItemControls ? { y:0 } : { y: 100 }} // Don't animate from bottom if active controls were just above it
-                        animate={{ y: 0 }}
-                        exit={{ y: 100 }}
-                        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                        className={`bg-gray-800 text-white shadow-top-md p-3 w-full ${showActiveItemControls ? '' : 'rounded-t-lg'}`} // Conditional rounding
+                        initial={showActiveItemControls ? { y:0, opacity: 1 } : { y: 50, opacity: 0 }} // Smoother initial animation
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: 50, opacity: 0, transition: { duration: 0.2 } }}
+                        transition={{ type: 'spring', stiffness: 280, damping: 25, delay: showActiveItemControls ? 0 : 0.05 }}
+                        // STYLES FOR MINI CART SUMMARY BAR
+                        className={`bg-white text-gray-800 shadow-xl p-3.5 w-full ${showActiveItemControls ? 'rounded-b-xl' : 'rounded-t-xl'}`} // White bg, conditional rounding
                     >
                         <div className="flex justify-between items-center">
-                            <div>
-                                <span className="font-semibold">{totalCartItems} عنصر</span>
-                                <span className="mx-2">|</span>
-                                <span className="font-bold text-yellow-400">{totalCartPrice} د.إ</span>
+                            <div className="flex flex-col"> {/* Stack items and price */}
+                                <span className="font-semibold text-sm">{totalCartItems} {totalCartItems === 1 ? 'عنصر' : 'عناصر'}</span>
+                                <span className="font-bold text-blue-600 text-lg">{totalCartPrice} د.إ</span>
                             </div>
                             <button
                                 onClick={() => {
@@ -1405,7 +1404,7 @@ const renderMiniCartBar = () => {
                                     setActiveMiniCartItem(null);
                                     setShowCart(true);
                                 }}
-                                className="bg-green-500 hover:bg-green-600 text-white px-5 py-2 rounded-lg text-sm font-semibold"
+                                className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2.5 rounded-lg text-sm font-semibold shadow-md hover:shadow-lg transition-all"
                             >
                                 عرض السلة
                             </button>
