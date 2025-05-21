@@ -1,0 +1,6 @@
+/* If using FeaturedSlider.css */
+.slides-wrapper {
+    /* ... other styles ... */
+    touch-action: pan-y; /* Allows vertical scroll, prioritizes horizontal for slider if content overflows */
+    user-select: none; /* Prevents text selection during drag */
+}

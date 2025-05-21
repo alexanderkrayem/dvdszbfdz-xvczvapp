@@ -1,9 +1,10 @@
 // src/components/MainPanel.jsx
 
 import React, { useState, useEffect, useCallback     } from 'react'; // Ensure useEffect is imported
-import { Clock, MapPin, Plus, Minus, Trash2, Star, ShoppingCart, Search, X, Heart, TagIcon, ChevronLeftIcon, CheckCircle } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Clock, MapPin, Plus, Minus, Trash2, Star, ShoppingCart, Search, X, Heart, TagIcon, ChevronLeftIcon, CheckCircle, ChevronRightIcon} from 'lucide-react';
 
+import { motion, AnimatePresence } from 'framer-motion';
+import FeaturedSlider from './FeaturedSlider'; // Adjust path if needed
 const MainPanel = ({ telegramUser }) => {
     const PRODUCT_LIMIT_FOR_SEARCH = 10; // Define this constant
     const [activeSection, setActiveSection] = useState('exhibitions');
@@ -27,6 +28,7 @@ const [fetchedDeals, setFetchedDeals] = useState([]);
 const [isLoadingDeals, setIsLoadingDeals] = useState(false); // Start false, fetch when tab is active or on initial load
 const [dealError, setDealError] = useState(null);
 // Inside MainPanel component, with other useState hooks
+
 const [searchTerm, setSearchTerm] = useState('');
 // We'll add isSearching, searchResults, etc., later
 // Inside MainPanel component
@@ -73,6 +75,10 @@ const PRODUCTS_PER_PAGE = 12; // Or 20, or whatever you prefer as a default limi
     const [profileError, setProfileError] = useState(null);
     const [showAddressModal, setShowAddressModal] = useState(false);
     const [isPlacingOrder, setIsPlacingOrder] = useState(false); // For "Proceed to Checkout" button loading
+
+    const [featuredItemsData, setFeaturedItemsData] = useState([]); // Start with an empty array
+const [isLoadingFeaturedItems, setIsLoadingFeaturedItems] = useState(true); // To show loading state
+const [featuredItemsError, setFeaturedItemsError] = useState(null);
 
 // Inside MainPanel component
 const [userFavoriteProductIds, setUserFavoriteProductIds] = useState(new Set()); // Use a Set for efficient lookups
@@ -367,7 +373,47 @@ useEffect(() => {
     fetchSuppliers();
 }, []); // Empty dependency array, runs once on mount
 
-    // --- Removed the hardcoded 'products' array ---
+  // --- NEW: useEffect to fetch Featured Items ---
+// Inside MainPanel component, with other useEffect hooks
+
+// --- NEW: useEffect to fetch Featured Items ---
+// Inside MainPanel.jsx
+
+// ... (other state and imports) ...
+
+// useEffect to fetch REAL Featured Items from backend
+useEffect(() => {
+    const fetchFeaturedItems = async () => {
+        setIsLoadingFeaturedItems(true);
+        setFeaturedItemsError(null);
+        setFeaturedItemsData([]); // Clear previous items before fetching
+
+        try {
+            const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/featured-items`;
+            console.log("Fetching REAL featured items from:", apiUrl); // Log API call
+            const response = await fetch(apiUrl);
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({})); // Try to get error details
+                throw new Error(errorData.error || `Failed to fetch featured items: ${response.statusText}`);
+            }
+            const data = await response.json(); // This should be an array from your backend
+            
+            console.log("REAL featured items received:", data); // Log received data
+            setFeaturedItemsData(data || []); // Set data, or empty array if data is null/undefined
+
+        } catch (error) {
+            console.error("Failed to fetch featured items:", error);
+            setFeaturedItemsError(error.message);
+            setFeaturedItemsData([]); // Ensure it's an empty array on error
+        } finally {
+            setIsLoadingFeaturedItems(false);
+        }
+    };
+
+    fetchFeaturedItems();
+}, [import.meta.env.VITE_API_BASE_URL]); // Re-fetch if base URL changes (shouldn't often)
+                                      // Add other dependencies if needed (e.g., if featured items depend on user login state, add that user state)
 
     // --- useEffect to fetch products from the backend ---
     useEffect(() => {
@@ -1810,9 +1856,41 @@ const renderDealDetailModal = () => {
                         )
                     )}
                 </div>
+                
             ) : (
+            
+                
+
+                
                 // --- Render Regular Tabbed Content ---
                 <>
+                {/* --- NEW: Featured Slider --- */}
+{/* Only render if not in search results view and if you have items */}
+{!showSearchResultsView && ( // Only show slider if not in search results view
+    isLoadingFeaturedItems ? (
+        <div className="text-center py-10 my-4">
+            <p className="text-gray-500">جاري تحميل العروض المميزة...</p>
+            {/* Optional: Add a spinner */}
+        </div>
+    ) : featuredItemsError ? (
+        <div className="text-center py-10 my-4 text-red-500">
+            <p>خطأ في تحميل العروض المميزة: {featuredItemsError}</p>
+        </div>
+    ) : (
+        featuredItemsData && featuredItemsData.length > 0 && (
+            <FeaturedSlider
+                items={featuredItemsData}
+                onSlideClick={(item) => {
+                    console.log("Featured item clicked:", item);
+                    // Based on item.type, open Product/Deal/Supplier Detail Modal
+                    if (item.type === 'product' && item.id) handleShowProductDetails(item.id);
+                    else if (item.type === 'deal' && item.id) handleShowDealDetails(item.id);
+                    else if (item.type === 'supplier' && item.id) handleShowSupplierDetails(item.id);
+                }}
+            />
+        )
+    )
+)}
                     {activeSection === 'exhibitions' && (
                         <div className="space-y-4"> {/* Your Deals Tab Content */}
                             <h2 className="text-xl font-bold mb-4 text-gray-800">العروض المميزة</h2>

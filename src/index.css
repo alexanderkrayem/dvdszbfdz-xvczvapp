@@ -2,3 +2,11 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+@keyframes autoplay-progress-kf { /* Renamed keyframe to avoid conflicts */
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
