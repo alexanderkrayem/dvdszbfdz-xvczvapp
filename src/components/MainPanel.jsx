@@ -11,6 +11,7 @@ const MainPanel = ({ telegramUser }) => {
     const [selectedSupplier, setSelectedSupplier] = useState(null);
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [showCart, setShowCart] = useState(false);
+    const [pendingUpdate, setPendingUpdate] = useState(false);
    // Inside MainPanel component, with other useState hooks
 const [selectedProductDetails, setSelectedProductDetails] = useState(null); // Stores full details of the product being viewed
 const [showProductDetailModal, setShowProductDetailModal] = useState(false);
@@ -674,8 +675,23 @@ const handleToggleFavorite = async (productId) => {
 
 // Function to handle increasing quantity (or adding if not present)
 const handleIncreaseQuantity = async (productId) => {
-    if (!telegramUser?.id) return;
-    console.log(`Increasing quantity for product ${productId}`);
+    if (!telegramUser?.id || pendingUpdate) return;
+
+    // Optimistically update UI
+    setCartItems(prevItems => {
+        const existingItem = prevItems.find(item => item.product_id === productId);
+        if (existingItem) {
+            return prevItems.map(item =>
+                item.product_id === productId
+                    ? { ...item, quantity: item.quantity + 1 }
+                    : item
+            );
+        } else {
+            // Optimistically add new item (fallback)
+            return [...prevItems, { product_id: productId, quantity: 1 }];
+        }
+    });
+
     try {
         const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/cart`;
         const response = await fetch(apiUrl, {
@@ -684,36 +700,37 @@ const handleIncreaseQuantity = async (productId) => {
             body: JSON.stringify({ userId: telegramUser.id, productId: productId, quantity: 1 }),
         });
         if (!response.ok) throw new Error(`Failed to increase quantity: ${response.statusText}`);
-        
-        await doFetchCart(); // Refetch cart
 
-        // Update activeMiniCartItem if it's the one being changed
-        if (showActiveItemControls && activeMiniCartItem?.product_id === productId) {
-            const stillInCart = cartItems.find(item => item.product_id === productId);
-            if (stillInCart) {
-                setActiveMiniCartItem(stillInCart);
-            } else { // Should not happen if only increasing quantity
-                setShowActiveItemControls(false);
-                setActiveMiniCartItem(null);
-            }
-        }
+        await doFetchCart();
     } catch (error) {
         console.error("Error increasing quantity:", error);
         alert(`Error: ${error.message}`);
+        await doFetchCart(); // rollback to true server state
+    } finally {
+        setPendingUpdate(false);
     }
 };
 
+
 // Function to handle decreasing quantity
 const handleDecreaseQuantity = async (productId) => {
-    if (!telegramUser?.id) return;
-    console.log(`Decreasing quantity for product ${productId}`);
+    if (!telegramUser?.id || pendingUpdate) return;
 
     const itemInCart = cartItems.find(item => item.product_id === productId);
     if (!itemInCart) return;
 
     if (itemInCart.quantity <= 1) {
-        await handleRemoveItem(productId); // This will also update activeMiniCartItem if needed
+        await handleRemoveItem(productId); // still uses optimistic version
     } else {
+        // Optimistically update UI
+        setCartItems(prevItems =>
+            prevItems.map(item =>
+                item.product_id === productId
+                    ? { ...item, quantity: item.quantity - 1 }
+                    : item
+            )
+        );
+
         try {
             const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/cart/item/${productId}?userId=${telegramUser.id}`;
             const response = await fetch(apiUrl, {
@@ -722,45 +739,46 @@ const handleDecreaseQuantity = async (productId) => {
                 body: JSON.stringify({ newQuantity: itemInCart.quantity - 1 }),
             });
             if (!response.ok) throw new Error(`Failed to decrease quantity: ${response.statusText}`);
-            
-            await doFetchCart(); // Refetch cart
 
-            // Update activeMiniCartItem if it's the one being changed
-            if (showActiveItemControls && activeMiniCartItem?.product_id === productId) {
-                const stillInCart = cartItems.find(item => item.product_id === productId);
-                 // stillInCart should always exist here since quantity was > 1
-                if (stillInCart) {
-                    setActiveMiniCartItem(stillInCart);
-                }
-            }
+            await doFetchCart();
         } catch (error) {
             console.error("Error decreasing quantity:", error);
             alert(`Error: ${error.message}`);
-        }
+            await doFetchCart(); // rollback
+        } finally {
+        setPendingUpdate(false);
+    }
     }
 };
 
+
 // Function to handle removing an item completely
 const handleRemoveItem = async (productId) => {
-    if (!telegramUser?.id) return;
-    console.log(`Removing product ${productId} from cart`);
+    if (!telegramUser?.id || pendingUpdate) return;
+
+    // Optimistically remove from cart
+    setCartItems(prevItems => prevItems.filter(item => item.product_id !== productId));
+
+    if (showActiveItemControls && activeMiniCartItem?.product_id === productId) {
+        setShowActiveItemControls(false);
+        setActiveMiniCartItem(null);
+    }
+
     try {
         const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/cart/item/${productId}?userId=${telegramUser.id}`;
         const response = await fetch(apiUrl, { method: 'DELETE' });
         if (!response.ok) throw new Error(`Failed to remove item: ${response.statusText}`);
-        
-        await doFetchCart(); // Refetch cart
 
-        // If the removed item was the active one, hide the controls
-        if (showActiveItemControls && activeMiniCartItem?.product_id === productId) {
-            setShowActiveItemControls(false);
-            setActiveMiniCartItem(null);
-        }
+        await doFetchCart();
     } catch (error) {
         console.error("Error removing item:", error);
         alert(`Error: ${error.message}`);
+        await doFetchCart(); // rollback
+    } finally {
+        setPendingUpdate(false);
     }
 };
+
 
   const handleCheckout = async () => {
     if (!telegramUser?.id) {
@@ -1013,22 +1031,45 @@ const handleShowSupplierDetails = async (supplierId) => {
                           </div>
                           <div className="flex items-center gap-1 flex-shrink-0"> {/* Reduced gap */}
                               {/* --- NEW: Buttons --- */}
-                              <button
-                                  onClick={() => handleDecreaseQuantity(item.product_id)}
-                                  className="p-1.5 bg-gray-200 rounded text-gray-700 hover:bg-gray-300" aria-label="Decrease quantity">
-                                  <Minus className="h-3 w-3" /> {/* Use icon */}
-                              </button>
+                             <button
+  onClick={() => handleDecreaseQuantity(item.product_id)}
+  disabled={pendingUpdate}
+  className={`p-1.5 rounded text-gray-700 transition-colors ${pendingUpdate ? 'bg-gray-200 cursor-not-allowed' : 'bg-gray-200 hover:bg-gray-300'}`}
+  
+>
+  {pendingUpdate ? (
+    <Loader className="h-4 w-4 animate-spin text-gray-400" />
+  ) : (
+    <Minus className="h-4 w-4" />
+  )}
+</button>
+
                               <span className="w-6 text-center font-medium">{item.quantity}</span> {/* Fixed width */}
                                <button
-                                   onClick={() => handleIncreaseQuantity(item.product_id)}
-                                   className="p-1.5 bg-gray-200 rounded text-gray-700 hover:bg-gray-300" aria-label="Increase quantity">
-                                   <Plus className="h-3 w-3" /> {/* Use icon */}
-                               </button>
-                               <button
-                                   onClick={() => handleRemoveItem(item.product_id)}
-                                   className="p-1.5 text-red-500 hover:text-red-700" aria-label="Remove item">
-                                    <Trash2 className="h-4 w-4" /> {/* Use icon */}
-                                </button>
+  onClick={() => handleIncreaseQuantity(item.product_id)}
+  disabled={pendingUpdate}
+  className={`p-1.5 rounded text-gray-700 transition-colors ${pendingUpdate ? 'bg-gray-200 cursor-not-allowed' : 'bg-gray-200 hover:bg-gray-300'}`}
+  
+>
+  {pendingUpdate ? (
+    <Loader className="h-4 w-4 animate-spin text-gray-400" />
+  ) : (
+    <Plus className="h-4 w-4" />
+  )}
+</button>
+
+                              <button
+  onClick={() => handleRemoveItem(item.product_id)}
+  disabled={pendingUpdate}
+  className={`p-1.5 rounded text-red-500 transition-colors ${pendingUpdate ? 'cursor-not-allowed' : 'hover:text-red-700'}`}
+>
+  {pendingUpdate ? (
+    <Loader className="h-4 w-4 animate-spin text-gray-400" />
+  ) : (
+    <Trash2 className="h-4 w-4" />
+  )}
+</button>
+
                           </div>
                       </div>
                   ))
