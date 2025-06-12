@@ -1818,12 +1818,23 @@ const renderDealDetailModal = () => {
                     whileHover={{ y: -5, boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)' }}
                     onClick={() => handleShowProductDetails(product.id)}
                 >
-                    <div className="h-32 w-full flex items-center justify-center text-white relative bg-gray-200" style={{ background: product.image_url || 'linear-gradient(to right, #d1d5db, #9ca3af)' }}>
-                        {product.is_on_sale && (<div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-xs font-medium">تخفيض</div>)}
-                        <button onClick={(e) => { e.stopPropagation(); handleToggleFavorite(product.id);}} className="absolute top-2 right-2 p-1.5 bg-white/80 hover:bg-white rounded-full shadow-sm z-10">
-                            <Heart className={`h-5 w-5 ${userFavoriteProductIds.has(product.id) ? 'text-red-500 fill-red-500' : 'text-gray-400 hover:text-gray-600'}`}/>
-                        </button>
-                    </div>
+                     <div
+                                                        className="h-32 w-full flex items-center justify-center text-white relative bg-gray-100 rounded-t-xl overflow-hidden"
+                                                        style={
+                                                            product.image_url && product.image_url.startsWith('linear-gradient')
+                                                                ? { background: product.image_url }
+                                                                : {}
+                                                        }
+                                                    >
+                                                        {product.image_url && !product.image_url.startsWith('linear-gradient') ? (
+                                                            <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; const placeholder = e.currentTarget.parentElement.querySelector('.image-placeholder-text-search'); if(placeholder) placeholder.style.display = 'flex'; }} />
+                                                        ) : !product.image_url ? (
+                                                            <span className="text-xs text-gray-500 p-2 text-center image-placeholder-text-search flex items-center justify-center h-full">لا توجد صورة</span>
+                                                        ) : null}
+                                                        <span className="text-xs text-gray-500 p-2 text-center image-placeholder-text-search" style={{display: 'none', alignItems: 'center', justifyContent: 'center', height: '100%'}}>لا يمكن تحميل الصورة</span>
+                                                        {product.is_on_sale && (<div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-xs font-medium">تخفيض</div>)}
+                                                        <button onClick={(e) => { e.stopPropagation(); handleToggleFavorite(product.id);}} className="absolute top-2 right-2 p-1.5 bg-white/80 hover:bg-white rounded-full shadow-sm z-10"><Heart className={`h-5 w-5 ${userFavoriteProductIds.has(product.id) ? 'text-red-500 fill-red-500' : 'text-gray-400 hover:text-gray-600'}`}/></button>
+                                                    </div>
                     <div className="p-3 flex flex-col flex-grow">
                         <h4 className="font-semibold text-sm mb-1 text-gray-800 flex-grow min-h-[2.5em] line-clamp-2">{product.name}</h4>
                         <div className="flex items-end justify-between mt-auto">
@@ -1970,11 +1981,23 @@ const renderDealDetailModal = () => {
                                                  // Your Product Card from previous step
                                                  <motion.div key={`tab-prod-${product.id}`} className="bg-white rounded-xl shadow-md overflow-hidden cursor-pointer flex flex-col z-0" whileHover={{ y: -5, boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)' }} onClick={() => handleShowProductDetails(product.id)} // MODIFIED
 >
-                                                     <div className="h-32 w-full flex items-center justify-center text-white relative bg-gray-200" style={{ background: product.image_url || 'linear-gradient(to right, #d1d5db, #9ca3af)' }}>
-                                                         {product.is_on_sale && (<div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-xs font-medium">تخفيض</div>)}
-                                                    
-                                                         <button onClick={(e) => { e.stopPropagation(); handleToggleFavorite(product.id);}} className="absolute top-2 right-2 p-1.5 bg-white/80 hover:bg-white rounded-full shadow-sm z-10"><Heart className={`h-5 w-5 ${userFavoriteProductIds.has(product.id) ? 'text-red-500 fill-red-500' : 'text-gray-400 hover:text-gray-600'}`}/></button>
-                                                     </div>
+                                                     <div
+                                                        className="h-32 w-full flex items-center justify-center text-white relative bg-gray-100 rounded-t-xl overflow-hidden"
+                                                        style={
+                                                            product.image_url && product.image_url.startsWith('linear-gradient')
+                                                                ? { background: product.image_url }
+                                                                : {}
+                                                        }
+                                                    >
+                                                        {product.image_url && !product.image_url.startsWith('linear-gradient') ? (
+                                                            <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; const placeholder = e.currentTarget.parentElement.querySelector('.image-placeholder-text-tab'); if(placeholder) placeholder.style.display = 'flex';}} />
+                                                        ) : !product.image_url ? (
+                                                            <span className="text-xs text-gray-500 p-2 text-center image-placeholder-text-tab flex items-center justify-center h-full">لا توجد صورة</span>
+                                                        ) : null}
+                                                         <span className="text-xs text-gray-500 p-2 text-center image-placeholder-text-tab" style={{display: 'none', alignItems: 'center', justifyContent: 'center', height: '100%'}}>لا يمكن تحميل الصورة</span>
+                                                        {product.is_on_sale && (<div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-xs font-medium">تخفيض</div>)}
+                                                        <button onClick={(e) => { e.stopPropagation(); handleToggleFavorite(product.id);}} className="absolute top-2 right-2 p-1.5 bg-white/80 hover:bg-white rounded-full shadow-sm z-10"><Heart className={`h-5 w-5 ${userFavoriteProductIds.has(product.id) ? 'text-red-500 fill-red-500' : 'text-gray-400 hover:text-gray-600'}`}/></button>
+                                                    </div>
                                                      <div className="p-3 flex flex-col flex-grow">
                                                          <h3 className="font-semibold text-sm mb-1 text-gray-800 flex-grow min-h-[2.5em] line-clamp-2">{product.name}</h3>
                                                          <div className="flex items-end justify-between mt-auto">
@@ -2044,10 +2067,23 @@ const renderDealDetailModal = () => {
                                 whileHover={{ y: -5, boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)' }}
                                 onClick={() => handleShowProductDetails(product.id)}
                             >
-                                <div className="h-32 w-full flex items-center justify-center text-white relative bg-gray-200" style={{ background: product.image_url || 'linear-gradient(to right, #d1d5db, #9ca3af)' }}>
-                                    {product.is_on_sale && (<div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-xs font-medium">تخفيض</div>)}
-                                    <button onClick={(e) => { e.stopPropagation(); handleToggleFavorite(product.id);}} className="absolute top-2 right-2 p-1.5 bg-white/80 hover:bg-white rounded-full shadow-sm z-10"><Heart className={`h-5 w-5 ${userFavoriteProductIds.has(product.id) ? 'text-red-500 fill-red-500' : 'text-gray-400 hover:text-gray-600'}`}/></button>
-                                </div>
+                                 <div
+                                                        className="h-32 w-full flex items-center justify-center text-white relative bg-gray-100 rounded-t-xl overflow-hidden"
+                                                        style={
+                                                            product.image_url && product.image_url.startsWith('linear-gradient')
+                                                                ? { background: product.image_url }
+                                                                : {}
+                                                        }
+                                                    >
+                                                        {product.image_url && !product.image_url.startsWith('linear-gradient') ? (
+                                                            <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; const placeholder = e.currentTarget.parentElement.querySelector('.image-placeholder-text-fav'); if(placeholder) placeholder.style.display = 'flex'; }}/>
+                                                        ) : !product.image_url ? (
+                                                            <span className="text-xs text-gray-500 p-2 text-center image-placeholder-text-fav flex items-center justify-center h-full">لا توجد صورة</span>
+                                                        ) : null}
+                                                        <span className="text-xs text-gray-500 p-2 text-center image-placeholder-text-fav" style={{display: 'none', alignItems: 'center', justifyContent: 'center', height: '100%'}}>لا يمكن تحميل الصورة</span>
+                                                        {product.is_on_sale && (<div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-xs font-medium">تخفيض</div>)}
+                                                        <button onClick={(e) => { e.stopPropagation(); handleToggleFavorite(product.id);}} className="absolute top-2 right-2 p-1.5 bg-white/80 hover:bg-white rounded-full shadow-sm z-10"><Heart className={`h-5 w-5 ${userFavoriteProductIds.has(product.id) ? 'text-red-500 fill-red-500' : 'text-gray-400 hover:text-gray-600'}`}/></button>
+                                                    </div>
                                 <div className="p-3 flex flex-col flex-grow">
                                     <h3 className="font-semibold text-sm mb-1 text-gray-800 flex-grow min-h-[2.5em] line-clamp-2">{product.name}</h3>
                                     <div className="flex items-end justify-between mt-auto">
