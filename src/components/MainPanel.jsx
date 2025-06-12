@@ -1130,7 +1130,7 @@ const renderSupplierDetailModal = () => {
             <div className="p-2.5">
                 <h4 className="font-semibold text-xs text-gray-800 line-clamp-2 mb-1 h-8">{product.name}</h4>
                 <div className="text-blue-600 font-bold text-sm">
-                    {parseFloat(product.is_on_sale && product.discount_price ? product.discount_price : product.price).toFixed(2)} د.إ
+                    {parseFloat(product.is_on_sale && product.discount_price ? product.discount_price : product.effective_selling_price).toFixed(2)} د.إ
                 </div>
             </div>
         </motion.div>
@@ -1331,11 +1331,11 @@ const renderProductDetailModal = () => {
                             <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
                                 {product.is_on_sale && product.discount_price && (
                                     <p className="text-xl text-gray-500 line-through">
-                                        {parseFloat(product.price).toFixed(2)} د.إ
+                                        {parseFloat(product.effective_selling_price).toFixed(2)} د.إ
                                     </p>
                                 )}
                                 <p className="text-4xl font-extrabold text-blue-600">
-                                    {parseFloat(product.is_on_sale && product.discount_price ? product.discount_price : product.price).toFixed(2)} د.إ
+                                    {parseFloat(product.is_on_sale && product.discount_price ? product.discount_price : product.effective_selling_price).toFixed(2)} د.إ
                                 </p>
                             </div>
 
@@ -1828,8 +1828,8 @@ const renderDealDetailModal = () => {
                         <h4 className="font-semibold text-sm mb-1 text-gray-800 flex-grow min-h-[2.5em] line-clamp-2">{product.name}</h4>
                         <div className="flex items-end justify-between mt-auto">
                             <div>
-                                {product.is_on_sale && product.discount_price && (<span className="text-xs line-through text-gray-400 mr-1">{parseFloat(product.price).toFixed(2)} د.إ</span>)}
-                                <div className="text-blue-600 font-bold text-base">{parseFloat(product.is_on_sale && product.discount_price ? product.discount_price : product.price).toFixed(2)} د.إ</div>
+                                {product.is_on_sale && product.discount_price && (<span className="text-xs line-through text-gray-400 mr-1">{parseFloat(product.effective_selling_price).toFixed(2)} د.إ</span>)}
+                                <div className="text-blue-600 font-bold text-base">{parseFloat(product.is_on_sale && product.discount_price ? product.discount_price : product.effective_selling_price).toFixed(2)} د.إ</div>
                             </div>
                             <button onClick={(e) => { e.stopPropagation(); addToCart(product);}} className="p-2 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-500 hover:text-white">
                                 <ShoppingCart className="h-4 w-4" />
@@ -1979,8 +1979,8 @@ const renderDealDetailModal = () => {
                                                          <h3 className="font-semibold text-sm mb-1 text-gray-800 flex-grow min-h-[2.5em] line-clamp-2">{product.name}</h3>
                                                          <div className="flex items-end justify-between mt-auto">
                                                              <div>
-                                                                 {product.is_on_sale && product.discount_price && (<span className="text-xs line-through text-gray-400 mr-1">{parseFloat(product.price).toFixed(2)} د.إ</span>)}
-                                                                 <div className="text-blue-600 font-bold text-base">{parseFloat(product.is_on_sale && product.discount_price ? product.discount_price : product.price).toFixed(2)} د.إ</div>
+                                                                 {product.is_on_sale && product.discount_price && (<span className="text-xs line-through text-gray-400 mr-1">{parseFloat(product.effective_selling_price).toFixed(2)} د.إ</span>)}
+                                                                 <div className="text-blue-600 font-bold text-base">{parseFloat(product.is_on_sale && product.discount_price ? product.discount_price : product.effective_selling_price).toFixed(2)} د.إ</div>
                                                              </div>
                                                              <button onClick={(e) => { e.stopPropagation(); addToCart(product);}} className="p-2 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-500 hover:text-white"><ShoppingCart className="h-4 w-4" /></button>
                                                          </div>
@@ -2052,8 +2052,8 @@ const renderDealDetailModal = () => {
                                     <h3 className="font-semibold text-sm mb-1 text-gray-800 flex-grow min-h-[2.5em] line-clamp-2">{product.name}</h3>
                                     <div className="flex items-end justify-between mt-auto">
                                         <div>
-                                            {product.is_on_sale && product.discount_price && (<span className="text-xs line-through text-gray-400 mr-1">{parseFloat(product.price).toFixed(2)} د.إ</span>)}
-                                            <div className="text-blue-600 font-bold text-base">{parseFloat(product.is_on_sale && product.discount_price ? product.discount_price : product.price).toFixed(2)} د.إ</div>
+                                            {product.is_on_sale && product.discount_price && (<span className="text-xs line-through text-gray-400 mr-1">{parseFloat(product.effective_selling_price).toFixed(2)} د.إ</span>)}
+                                            <div className="text-blue-600 font-bold text-base">{parseFloat(product.is_on_sale && product.discount_price ? product.discount_price : product.effective_selling_price).toFixed(2)} د.إ</div>
                                         </div>
                                         <button onClick={(e) => { e.stopPropagation(); addToCart(product);}} className="p-2 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-500 hover:text-white"><ShoppingCart className="h-4 w-4" /></button>
                                     </div>
