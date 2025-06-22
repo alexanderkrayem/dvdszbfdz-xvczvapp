@@ -1,5 +1,5 @@
 // src/components/tabs/OrdersTab.jsx
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { ShoppingCart } from 'lucide-react';
 
 const OrdersTab = ({ orders, isLoading, error, highlightedOrderId }) => {

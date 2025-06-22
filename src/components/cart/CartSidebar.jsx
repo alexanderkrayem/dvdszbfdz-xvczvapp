@@ -34,7 +34,7 @@ const CartSidebar = ({ show, onClose, cartItems, isLoading, error, onIncrease, o
                         <div className="h-16 w-16 rounded-lg flex-shrink-0 bg-cover bg-center" style={{ backgroundImage: `url(${item.image_url})` }}></div>
                         <div className="flex-1 min-w-0">
                             <h3 className="font-medium truncate">{item.name}</h3>
-                            <div className="text-blue-600">{item.is_on_sale && item.discount_price ? item.discount_price : item.price} د.إ</div>
+                          <div className="text-blue-600">{item.effective_selling_price} د.إ</div>
                         </div>
                         <div className="flex items-center gap-1 flex-shrink-0">
                             <button onClick={() => onDecrease(item.product_id)} disabled={pendingUpdate} className="p-1.5 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-50"><Minus className="h-4 w-4" /></button>
