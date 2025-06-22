@@ -244,6 +244,37 @@ const MainPanel = ({ telegramUser }) => {
     }, [activeSection, telegramUser?.id, import.meta.env.VITE_API_BASE_URL]); // Dependencies
     // --- NEW: useEffect to fetch Deals when 'exhibitions' tab is active ---
 
+     useEffect(() => {
+        // Determine if any modal is currently open
+        const isAnyModalOpen =
+            showProductDetailModal ||
+            showDealDetailModal ||
+            showSupplierDetailModal ||
+            showAddressModal ||
+            showOrderConfirmationModal ||
+            showCart; // The cart sidebar also acts like a modal
+
+        if (isAnyModalOpen) {
+            // When a modal is open, prevent the body from scrolling
+            document.body.style.overflow = 'hidden';
+        } else {
+            // When all modals are closed, restore body scrolling
+            document.body.style.overflow = 'auto';
+        }
+
+        // Cleanup function to ensure scrolling is restored if the component unmounts
+        return () => {
+            document.body.style.overflow = 'auto';
+        };
+    }, [
+        showProductDetailModal,
+        showDealDetailModal,
+        showSupplierDetailModal,
+        showAddressModal,
+        showOrderConfirmationModal,
+        showCart,
+    ]); 
+
     useEffect(() => {
         const fetchFullFavoriteProducts = async () => {
             if (activeSection === 'favorites' && telegramUser?.id) {
@@ -350,6 +381,13 @@ const MainPanel = ({ telegramUser }) => {
 
 
     // --- Handler Functions ---
+    const handleAddressFormChange = (e) => {
+    const { name, value } = e.target;
+    setAddressFormData(prevData => ({
+        ...prevData,
+        [name]: value
+    }));
+};
     const handleSearchInputChange = (e) => setSearchTerm(e.target.value);
     const clearSearch = () => {
         setSearchTerm('');
@@ -370,40 +408,40 @@ const MainPanel = ({ telegramUser }) => {
         } catch (error) { console.error("Failed to add to cart:", error); }
     };
 
-    const handleIncreaseQuantity = async (productId) => {
-    if (!telegramUser?.id || pendingUpdate) return;
+const handleIncreaseQuantity = async (productId) => {
+    if (!telegramUser?.id || !productId) {
+        console.error("Cannot increase quantity: Missing user or product ID.");
+        return;
+    }
 
-    // Optimistically update UI
-    setCartItems(prevItems => {
-        const existingItem = prevItems.find(item => item.product_id === productId);
-        if (existingItem) {
-            return prevItems.map(item =>
-                item.product_id === productId
-                    ? { ...item, quantity: item.quantity + 1 }
-                    : item
-            );
-        } else {
-            // Optimistically add new item (fallback)
-            return [...prevItems, { product_id: productId, quantity: 1 }];
-        }
-    });
+    // You can add optimistic UI updates here if you want
 
     try {
-        const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/cart`;
+        const apiUrl = `${API_BASE_URL}/api/cart`; // This should be your "add/update" endpoint
         const response = await fetch(apiUrl, {
-            method: 'POST',
+            method: 'POST', // Or 'PUT', depending on your backend logic
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: telegramUser.id, productId: productId, quantity: 1 }),
+            body: JSON.stringify({
+                userId: telegramUser.id,
+                productId: productId,
+                quantity: 1 // Assuming this endpoint adds 1 to the existing quantity
+            }),
         });
-        if (!response.ok) throw new Error(`Failed to increase quantity: ${response.statusText}`);
 
+        if (!response.ok) {
+            // Log the error response from the backend for better debugging
+            const errorData = await response.json().catch(() => ({}));
+            console.error("Backend error on increasing quantity:", errorData);
+            throw new Error(`Failed to increase quantity: ${response.statusText}`);
+        }
+
+        // Refetch the cart to get the latest state from the server
         await doFetchCart();
+
     } catch (error) {
         console.error("Error increasing quantity:", error);
-        alert(`Error: ${error.message}`);
-        await doFetchCart(); // rollback to true server state
-    } finally {
-        setPendingUpdate(false);
+        // Optionally, refetch cart on error to revert optimistic UI updates
+        await doFetchCart();
     }
 };
 
@@ -768,7 +806,7 @@ const handleViewAllSupplierProducts = (supplierName) => {
     // 3. RENDER METHOD
     // =================================================================
     return (
-        <div className="min-h-screen bg-gray-50" dir="rtl">
+        <div className="min-h-screen bg-gray-50 overflow-y-auto h-full" dir="rtl">
             {/* Header */}
             <header className="bg-white sticky top-0 z-30 shadow-sm">
                 <div className="p-4 max-w-4xl mx-auto">

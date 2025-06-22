@@ -13,6 +13,7 @@ const MiniCartBar = ({ cartItems, showActiveItemControls, activeMiniCartItem, on
     const renderActiveItemControls = () => {
         const currentItemInCart = cartItems.find(item => item.product_id === activeMiniCartItem?.product_id);
         const displayItem = currentItemInCart || activeMiniCartItem;
+console.log("MiniCartBar: displayItem =", displayItem); // 👈 Paste this here
 
         if (!showActiveItemControls || !displayItem || displayItem.quantity === 0) {
             return null;

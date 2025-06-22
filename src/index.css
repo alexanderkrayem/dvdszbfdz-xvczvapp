@@ -3,6 +3,19 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  html,
+  body,
+  #root {
+    @apply h-full overflow-hidden bg-gray-50; /* Match your app's bg color */
+  }
+
+  
+  #root > div {
+    @apply h-full;
+  }
+}
+
 @layer utilities {
   .highlight-order {
     animation: highlight 2.5s ease-out;

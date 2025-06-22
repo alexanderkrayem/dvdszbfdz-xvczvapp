@@ -2,45 +2,69 @@
 import React, { useEffect, useState } from 'react';
 import MainPanel from './components/MainPanel'; // Import your MainPanel component
 
-// Access the Telegram Web App object safely
-const tg = window.Telegram?.WebApp;
-
 function App() {
-
   const [telegramUser, setTelegramUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(true); // Add loading state
 
   useEffect(() => {
-    // This code runs once when the app starts
-    if (tg) {
-      console.log("Telegram WebApp SDK found. Calling tg.ready().");
-      tg.ready(); // IMPORTANT: Tell Telegram the app is ready
+    const tg = window.Telegram?.WebApp;
 
-      // Log initial data (useful for debugging in Telegram)
-      console.log("InitData Unsafe:", tg.initDataUnsafe);
+    if (tg) {
+      // --- PRODUCTION / TELEGRAM ENVIRONMENT ---
+      console.log("Telegram WebApp SDK found. App is running in Telegram.");
+      tg.ready();
+      tg.expand(); // Optional: Make the app full screen
+
       if (tg.initDataUnsafe?.user) {
-        console.log("User:", tg.initDataUnsafe.user);
+        console.log("Real Telegram user found:", tg.initDataUnsafe.user);
         setTelegramUser(tg.initDataUnsafe.user);
       } else {
-        console.log("User data not available within initDataUnsafe.");
+        console.warn("User data not available within Telegram. Using a fallback user.");
+        // Provide a fallback user in the rare case the user object is missing in TG
+        setTelegramUser({
+          id: 999999999,
+          first_name: 'TG',
+          last_name: 'Fallback',
+          username: 'tg_fallback_user'
+        });
       }
     } else {
-      // This message will likely show when running in a normal browser
-      console.warn("Telegram WebApp SDK (window.Telegram.WebApp) not found. App might not function fully outside Telegram.");
+      // --- LOCAL DEVELOPMENT ENVIRONMENT ---
+      console.warn("Telegram WebApp SDK not found. Running in local browser mode.");
+
+      // Create a mock user object for local testing
+      const mockUser = {
+        id: 123456789, // Use a consistent ID for predictable testing
+        first_name: 'Local',
+        last_name: 'Developer',
+        username: 'localdev',
+        language_code: 'en',
+        is_premium: true,
+      };
+
+      console.log("Using mock user for local development:", mockUser);
+      setTelegramUser(mockUser);
     }
 
-    // Cleanup function (optional)
-    return () => {
-      if (tg) {
-        // You might add cleanup here later if you use things like tg.MainButton.onClick
-      }
-    }
-  }, []); // Empty dependency array means run once on mount
+    setIsLoading(false); // We have a user (real or mock), so we can stop loading
 
-  // Render the MainPanel component which now handles its own data fetching
+  }, []); // Empty dependency array means this runs only once
+
+  // While loading, show a simple message to prevent rendering the app without a user
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-100">
+        <p className="text-gray-600 animate-pulse">Initializing Application...</p>
+      </div>
+    );
+  }
+
+  // Once loaded, render the MainPanel with the telegramUser prop
   return (
-    <MainPanel telegramUser={telegramUser} />
+    <div className="App">
+        <MainPanel telegramUser={telegramUser} />
+    </div>
   );
-
 }
 
 export default App;
