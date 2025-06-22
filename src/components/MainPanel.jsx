@@ -6,6 +6,7 @@ import { AnimatePresence } from 'framer-motion';
 // Import Custom Hooks and All New Components
 import { useDebounce } from '../hooks/useDebounce';
 import FeaturedSlider from './FeaturedSlider';
+import FeaturedSliderSkeleton from './FeaturedSliderSkeleton';
 import ProductsTab from './tabs/ProductsTab';
 import DealsTab from './tabs/DealsTab';
 import SuppliersTab from './tabs/SuppliersTab';
@@ -830,17 +831,34 @@ const handleViewAllSupplierProducts = (supplierName) => {
                     />
                 ) : (
                     <>
-                        <FeaturedSlider
-                            items={featuredItemsData}
-                            isLoading={isLoadingFeaturedItems}
-                            error={featuredItemsError}
-                            onSlideClick={(item) => {
-                                if (item.type === 'product' && item.id) handleShowProductDetails(item.id);
-                                else if (item.type === 'deal' && item.id) handleShowDealDetails(item.id);
-                                else if (item.type === 'supplier' && item.id) handleShowSupplierDetails(item.id);
-                            }}
-                        />
-                        
+ 
+ {!showSearchResultsView && ( // Only render this block if not in search view
+    <div className="featured-container my-6">
+        {/*
+          This logic now works because FeaturedSlider will correctly
+          show the skeleton when isLoading is true.
+        */}
+        {featuredItemsError ? (
+            // State 1: We have an error. Highest priority after loading.
+            <div className="text-center py-10 text-red-500">
+                <p>خطأ في تحميل العروض المميزة: {featuredItemsError}</p>
+            </div>
+        ) : (
+            // If no error, we render the slider component.
+            // It will internally decide to show the skeleton or the real slider.
+            <FeaturedSlider
+                isLoading={isLoadingFeaturedItems}
+                items={featuredItemsData}
+                onSlideClick={(item) => {
+                    if (item.type === 'product' && item.id) handleShowProductDetails(item.id);
+                    else if (item.type === 'deal' && item.id) handleShowDealDetails(item.id);
+                    else if (item.type === 'supplier' && item.id) handleShowSupplierDetails(item.id);
+                }}
+            />
+        )}
+        
+    </div>
+)}                       
                         {activeSection === 'exhibitions' && <DealsTab deals={fetchedDeals} isLoading={isLoadingDeals} error={dealError} onShowDetails={handleShowDealDetails} />}
                         {activeSection === 'products' && <ProductsTab products={fetchedProducts} isLoading={isLoadingProducts} error={productError} onLoadMore={handleLoadMoreProducts} hasMorePages={currentProductPage < totalProductPages} isLoadingMore={isLoadingMoreProducts} onAddToCart={addToCart} onToggleFavorite={handleToggleFavorite} onShowDetails={handleShowProductDetails} favoriteProductIds={userFavoriteProductIds} />}
                         {activeSection === 'suppliers' && <SuppliersTab suppliers={fetchedSuppliers} isLoading={isLoadingSuppliers} error={supplierError} onShowDetails={handleShowSupplierDetails} />}

@@ -6,31 +6,35 @@ import './FeaturedSlider.css';
 import 'swiper/css';
 import 'swiper/css/effect-coverflow';
 import 'swiper/css/autoplay';
+
+// Import the new skeleton component
 import FeaturedSliderSkeleton from './FeaturedSliderSkeleton';
 
 const FeaturedSlider = ({ items = [], onSlideClick, isLoading = false }) => {
     const swiperRef = useRef(null);
     const [activeIndex, setActiveIndex] = useState(0);
 
-    // ***************************************************************
-    // THE CRUCIAL FIX IS HERE:
-    // We check for `isLoading` FIRST. If it's true, we ONLY show the skeleton.
-    // ***************************************************************
+    // --- RENDER SKELETON ---
+    // If isLoading is true, show the skeleton loader immediately.
     if (isLoading) {
         return <FeaturedSliderSkeleton />;
     }
 
-    // If we are NOT loading and there are no items, we render nothing at all.
-    // The parent component (`MainPanel`) will be responsible for showing the
-    // "No featured items" message. This prevents this component from showing it prematurely.
+    // --- RENDER NO ITEMS MESSAGE ---
+    // This now only runs if NOT loading and items are empty.
     if (!items || items.length === 0) {
-        return null;
+        return (
+            <div className="text-center py-10 my-4">
+                <p className="text-gray-500">لا توجد عروض مميزة حالياً.</p>
+            </div>
+        );
     }
 
     const autoplayDelay = 5000;
-    const enableLoop = items.length >= 4;
+    // Only enable loop if there are enough items to make it smooth
+    const enableLoop = items.length >= 4; 
 
-    // This part of the code will now only ever run if isLoading is false AND there are items.
+    // --- RENDER THE ACTUAL SLIDER ---
     return (
         <div className="slideshow-container w-full max-w-6xl mx-auto my-6 relative group px-4">
             <Swiper
