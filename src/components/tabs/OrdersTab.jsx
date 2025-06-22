@@ -2,7 +2,23 @@
 import React from 'react';
 import { ShoppingCart } from 'lucide-react';
 
-const OrdersTab = ({ orders, isLoading, error }) => {
+const OrdersTab = ({ orders, isLoading, error, highlightedOrderId }) => {
+    const orderRefs = useRef({});
+    
+    useEffect(() => {
+        if (highlightedOrderId && orders.length > 0) {
+            const highlightedOrderElement = orderRefs.current[highlightedOrderId];
+            
+            if (highlightedOrderElement) {
+                // Scroll the element into view with a smooth behavior
+                highlightedOrderElement.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center', // Aligns the element to the center of the viewport
+                });
+            }
+        }
+    }, [highlightedOrderId, orders]);
+
     const getStatusInfo = (status) => {
         switch (status) {
             case 'pending': return { text: 'قيد الانتظار', style: 'bg-yellow-100 text-yellow-800' };
@@ -26,18 +42,26 @@ console.log('[DEBUG] Rendering OrdersTab with orders:', orders);
         <div className="space-y-6">
             <h2 className="text-xl md:text-2xl font-bold text-gray-800">طلباتي</h2>
             {orders.length > 0 ? (
-                orders.map(order => (
-                    <div key={order.id} className="bg-white rounded-xl shadow-lg overflow-hidden">
-                        <div className="bg-gray-50 p-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between sm:items-center gap-2">
-                            <div>
-                                <p className="text-sm text-gray-500">طلب رقم: <span className="font-semibold text-gray-700">#{order.id}</span></p>
-                                <p className="text-sm text-gray-500">تاريخ الطلب: <span className="font-medium text-gray-700">{new Date(order.order_date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}</span></p>
+                orders.map(order => {
+                    const isHighlighted = order.id === highlightedOrderId;
+                    return (
+                        <div
+                            // Assign a ref to each order div using its ID
+                            ref={el => (orderRefs.current[order.id] = el)}
+                            key={order.id}
+                            // Apply the highlight class conditionally
+                            className={`bg-white rounded-xl shadow-lg overflow-hidden transition-all duration-500 ${isHighlighted ? 'highlight-order' : ''}`}
+                        >
+                            <div className="bg-gray-50 p-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+                                <div>
+                                    <p className="text-sm text-gray-500">طلب رقم: <span className="font-semibold text-gray-700">#{order.id}</span></p>
+                                    <p className="text-sm text-gray-500">تاريخ الطلب: <span className="font-medium text-gray-700">{new Date(order.order_date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}</span></p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-sm text-gray-500">الحالة: <span className={`ml-2 px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusInfo(order.status).style}`}>{getStatusInfo(order.status).text}</span></p>
+                                    <p className="text-lg font-bold text-blue-600 mt-1">{parseFloat(order.total_amount).toFixed(2)} د.إ</p>
+                                </div>
                             </div>
-                            <div className="text-right">
-                                <p className="text-sm text-gray-500">الحالة: <span className={`ml-2 px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusInfo(order.status).style}`}>{getStatusInfo(order.status).text}</span></p>
-                                <p className="text-lg font-bold text-blue-600 mt-1">{parseFloat(order.total_amount).toFixed(2)} د.إ</p>
-                            </div>
-                        </div>
                         <div className="p-4 space-y-3">
                             <h4 className="text-md font-semibold text-gray-700">المنتجات:</h4>
                             {order.items?.length > 0 ? (
@@ -52,7 +76,8 @@ console.log('[DEBUG] Rendering OrdersTab with orders:', orders);
                             ) : (<p className="text-sm text-gray-500">لا توجد تفاصيل للمنتجات.</p>)}
                         </div>
                     </div>
-                ))
+                      )
+                })
             ) : (
                 <div className="text-center text-gray-500 py-10">
                     <ShoppingCart className="h-12 w-12 mx-auto text-gray-400 mb-3" />

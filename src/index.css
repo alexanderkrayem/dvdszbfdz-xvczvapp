@@ -2,11 +2,33 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer utilities {
+  .highlight-order {
+    animation: highlight 2.5s ease-out;
+  }
+
 @keyframes autoplay-progress-kf { /* Renamed keyframe to avoid conflicts */
   from {
     width: 0%;
   }
   to {
     width: 100%;
+  }
+}
+
+@keyframes highlight {
+    0% {
+      background-color: theme('colors.blue.100');
+      box-shadow: 0 0 0 4px theme('colors.blue.300');
+    }
+    80% {
+      background-color: theme('colors.blue.100');
+      box-shadow: 0 0 0 4px theme('colors.blue.300');
+    }
+    100% {
+      background-color: theme('colors.white');
+      box-shadow: 0 0 0 0px theme('colors.blue.300 / 0%');
+    }
   }
 }
