@@ -7,7 +7,7 @@ const CartSidebar = ({ show, onClose, cartItems, isLoading, error, onIncrease, o
     if (!show) return null;
 
     const total = cartItems.reduce((total, item) => {
-        const price = item.is_on_sale && item.discount_price ? item.discount_price : item.price;
+        const price = item.effective_selling_price ?? 0;
         return total + (parseFloat(price) * item.quantity);
     }, 0).toFixed(2);
   console.log('[DEBUG] Rendering CartSidebar with items:', cartItems);

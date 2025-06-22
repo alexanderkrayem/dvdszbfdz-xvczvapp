@@ -1,11 +1,8 @@
-// src/components/modals/OrderConfirmationModal.jsx
 import React from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircle } from 'lucide-react';
 
-const OrderConfirmationModal = ({ show, onClose, orderDetails }) => {
-    if (!show) return null;
-
+const OrderConfirmationModal = ({ onClose, orderDetails }) => {
     return (
         <motion.div
             key="orderConfirmationModal"

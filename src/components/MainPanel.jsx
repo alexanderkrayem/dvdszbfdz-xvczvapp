@@ -24,6 +24,7 @@ import OrderConfirmationModal from './modals/OrderConfirmationModal';
 const PRODUCT_LIMIT_FOR_SEARCH = 10;
 const PRODUCTS_PER_PAGE = 12;
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const SERVICEABLE_CITIES = ['Dubai', 'Abu Dhabi', 'Sharjah', 'Ajman', 'Umm Al-Quwain', 'Ras Al-Khaimah', 'Fujairah'];
 
 const MainPanel = ({ telegramUser }) => {
     // =================================================================
@@ -79,6 +80,7 @@ const MainPanel = ({ telegramUser }) => {
     const [fetchedOrders, setFetchedOrders] = useState([]);
     const [isLoadingOrdersTab, setIsLoadingOrdersTab] = useState(false);
     const [ordersTabError, setOrdersTabError] = useState(null);
+    const [highlightedOrderId, setHighlightedOrderId] = useState(null);
     
     // --- Featured Items State ---
     const [featuredItemsData, setFeaturedItemsData] = useState([]);
@@ -737,7 +739,7 @@ const proceedToCreateOrder = async () => {
 
         const orderResult = await response.json();
         console.log("Order created:", orderResult);
-
+setHighlightedOrderId(orderResult.orderId);
         setConfirmedOrderDetails(orderResult); // Store order details for the modal
 setShowOrderConfirmationModal(true);  // Show the confirmation modal
 
@@ -843,7 +845,7 @@ const handleViewAllSupplierProducts = (supplierName) => {
                         {activeSection === 'products' && <ProductsTab products={fetchedProducts} isLoading={isLoadingProducts} error={productError} onLoadMore={handleLoadMoreProducts} hasMorePages={currentProductPage < totalProductPages} isLoadingMore={isLoadingMoreProducts} onAddToCart={addToCart} onToggleFavorite={handleToggleFavorite} onShowDetails={handleShowProductDetails} favoriteProductIds={userFavoriteProductIds} />}
                         {activeSection === 'suppliers' && <SuppliersTab suppliers={fetchedSuppliers} isLoading={isLoadingSuppliers} error={supplierError} onShowDetails={handleShowSupplierDetails} />}
                         {activeSection === 'favorites' && <FavoritesTab favoriteProducts={fetchedFavoriteProducts} isLoading={isLoadingFavoritesTab} error={favoritesTabError} onAddToCart={addToCart} onToggleFavorite={handleToggleFavorite} onShowDetails={handleShowProductDetails} favoriteProductIds={userFavoriteProductIds} />}
-                        {activeSection === 'orders' && <OrdersTab orders={fetchedOrders} isLoading={isLoadingOrdersTab} error={ordersTabError} />}
+                        {activeSection === 'orders' && <OrdersTab orders={fetchedOrders} isLoading={isLoadingOrdersTab} error={ordersTabError} highlightedOrderId={highlightedOrderId} />}
                     </>
                 )}
             </main>
@@ -898,6 +900,7 @@ const handleViewAllSupplierProducts = (supplierName) => {
                         onFormSubmit={handleSaveProfile}
                         error={profileError}
                         isSaving={isPlacingOrder}
+                        availableCities={SERVICEABLE_CITIES}
                     />
                 )}
                 
@@ -955,9 +958,8 @@ const handleViewAllSupplierProducts = (supplierName) => {
                         show={showOrderConfirmationModal}
                         onClose={() => {
                             setShowOrderConfirmationModal(false);
-                            if (window.Telegram?.WebApp) {
-                                window.Telegram.WebApp.close();
-                            }
+                            setActiveSection('orders');
+                    
                         }}
                         orderDetails={confirmedOrderDetails}
                     />

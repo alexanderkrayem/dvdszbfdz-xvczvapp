@@ -5,7 +5,7 @@ import { X, Plus, Minus, Trash2, ShoppingCart } from 'lucide-react';
 
 const MiniCartBar = ({ cartItems, showActiveItemControls, activeMiniCartItem, onIncrease, onDecrease, onRemove, onHideActiveItem, onViewCart }) => {
     const totalCartPrice = cartItems.reduce((total, item) => {
-        const price = item.is_on_sale && item.discount_price ? item.discount_price : item.price;
+        const price = item.effective_selling_price ?? 0;
         return total + (parseFloat(price) * item.quantity);
     }, 0).toFixed(2);
     const totalCartItems = cartItems.reduce((acc, item) => acc + item.quantity, 0);

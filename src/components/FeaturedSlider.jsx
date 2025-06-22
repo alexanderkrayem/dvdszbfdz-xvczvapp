@@ -54,7 +54,7 @@ const FeaturedSlider = ({ items = [], onSlideClick }) => {
                 className="!py-2"
             >
                 {items.map((item, index) => (
-                    <SwiperSlide key={item.id || index} className="px-1 box-border">
+                    <SwiperSlide key={`${item.type}-${item.id}`} className="px-1 box-border">
                         <div
                             className={`slide-inner-card w-full h-[260px] sm:h-[280px] md:h-[300px]
                                 rounded-xl overflow-hidden shadow-lg 
