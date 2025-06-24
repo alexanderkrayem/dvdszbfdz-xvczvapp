@@ -511,17 +511,66 @@ const handleRemoveItem = async (productId) => {
     }
 };
 
-const handleShowProductDetails = async (productId) => {
-        setShowProductDetailModal(true);
-        setIsLoadingProductDetail(true);
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/products/${productId}`);
-            if (!response.ok) throw new Error('Product not found');
-            const data = await response.json();
+const handleShowProductDetails = async (productId, context = 'default') => {
+    if (!productId) return;
+
+    // Reset state for the modal
+    setShowProductDetailModal(true);
+    setIsLoadingProductDetail(true);
+    setProductDetailError(null);
+    setSelectedProductDetails(null); // Clear previous details
+
+    // Determine the correct API endpoint based on the context
+    const isFromFavorites = context === 'favorites';
+    const apiUrl = isFromFavorites
+        ? `${API_BASE_URL}/api/favorites/product-details/${productId}`
+        : `${API_BASE_URL}/api/products/${productId}`;
+
+    console.log(`[ProductDetails] Fetching from: ${apiUrl}`);
+
+    try {
+        const response = await fetch(apiUrl);
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.error || `Failed to load product details: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+
+        // The data structure is now different depending on the endpoint
+        if (isFromFavorites) {
+            // Data from our new endpoint already has the correct structure:
+            // { originalProduct, isAvailable, alternatives }
             setSelectedProductDetails(data);
-        } catch (error) { setProductDetailError(error.message); }
-        finally { setIsLoadingProductDetail(false); }
-    };
+        } else {
+            // Data from the old endpoint is just the product, so we wrap it
+            // to match the structure our modal now expects.
+            setSelectedProductDetails({
+                originalProduct: data,
+                isAvailable: data.stock_level > 0, // Availability is based on stock
+                alternatives: []
+            });
+        }
+    } catch (error) {
+        console.error("Error fetching product details:", error);
+        setProductDetailError(error.message);
+    } finally {
+        setIsLoadingProductDetail(false);
+    }
+};
+
+const handleSelectAlternativeProduct = (productId) => {
+    // Close the current modal and open a new one for the selected alternative
+    setShowProductDetailModal(false);
+    
+    // Use a short timeout to allow the close animation to start before opening the new one
+    setTimeout(() => {
+        // Call the detail handler in 'default' mode for the new product,
+        // so it doesn't try to find more alternatives.
+        handleShowProductDetails(productId, 'default');
+    }, 200);
+};
 
     const handleShowDealDetails = async (dealId) => {
     if (!dealId) return;
@@ -965,12 +1014,17 @@ const handleViewAllSupplierProducts = (supplierName) => {
                         key="product-detail-modal"
                         show={showProductDetailModal}
                         onClose={() => setShowProductDetailModal(false)}
-                        product={selectedProductDetails}
+                        productData={selectedProductDetails}
                         isLoading={isLoadingProductDetail}
                         error={productDetailError}
                         onAddToCart={addToCart}
-                        onToggleFavorite={handleToggleFavorite}
-                        isFavorite={userFavoriteProductIds.has(selectedProductDetails?.id)}
+                         onToggleFavorite={{
+                toggle: handleToggleFavorite,
+                isFavorite: (id) => userFavoriteProductIds.has(id)
+            }}
+             onSelectAlternative={handleSelectAlternativeProduct} 
+                        
+                    
                     />
                 )}
                 

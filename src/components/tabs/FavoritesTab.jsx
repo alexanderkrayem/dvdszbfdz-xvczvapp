@@ -23,7 +23,7 @@ const FavoritesTab = ({ favoriteProducts, isLoading, error, onAddToCart, onToggl
                             product={product}
                             onAddToCart={onAddToCart}
                             onToggleFavorite={onToggleFavorite}
-                            onShowDetails={onShowDetails}
+                             onShowDetails={(id) => onShowDetails(id, 'favorites')}
                             isFavorite={favoriteProductIds.has(product.id)}
                         />
                     ))}
