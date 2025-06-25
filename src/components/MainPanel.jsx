@@ -1,6 +1,6 @@
 // src/components/MainPanel.jsx
-import React, { useState, useEffect, useCallback } from 'react';
-import { ShoppingCart, Search, X } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { ShoppingCart, Search, X, MapPin } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 
 // Import Custom Hooks and All New Components
@@ -20,14 +20,15 @@ import ProductDetailModal from './modals/ProductDetailModal';
 import DealDetailModal from './modals/DealDetailModal';
 import SupplierDetailModal from './modals/SupplierDetailModal';
 import OrderConfirmationModal from './modals/OrderConfirmationModal';
-
+import CitySelectionModal from './modals/CitySelectionModal';
+import CityChangePopover from './common/CityChangePopover'; 
 // Constants
 const PRODUCT_LIMIT_FOR_SEARCH = 10;
 const PRODUCTS_PER_PAGE = 12;
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 const SERVICEABLE_CITIES = ['Dubai', 'Abu Dhabi', 'Sharjah', 'Ajman', 'Umm Al-Quwain', 'Ras Al-Khaimah', 'Fujairah'];
 
-const MainPanel = ({ telegramUser }) => {
+const MainPanel = ({ telegramUser, userProfile, onProfileUpdate }) => {
     // =================================================================
     // 1. STATE MANAGEMENT
     // =================================================================
@@ -105,7 +106,7 @@ const MainPanel = ({ telegramUser }) => {
     const [supplierDetailError, setSupplierDetailError] = useState(null);
 
     const [showAddressModal, setShowAddressModal] = useState(false);
-    const [userProfile, setUserProfile] = useState(null);
+    
     const [isLoadingProfile, setIsLoadingProfile] = useState(false);
     const [profileError, setProfileError] = useState(null);
     const [addressFormData, setAddressFormData] = useState({ fullName: '', phoneNumber: '', addressLine1: '', addressLine2: '', city: '' });
@@ -113,6 +114,9 @@ const MainPanel = ({ telegramUser }) => {
     const [isPlacingOrder, setIsPlacingOrder] = useState(false);
     const [showOrderConfirmationModal, setShowOrderConfirmationModal] = useState(false);
     const [confirmedOrderDetails, setConfirmedOrderDetails] = useState(null);
+    const selectedCityId = userProfile?.selected_city_id;
+    const [isCityPopoverOpen, setIsCityPopoverOpen] = useState(false);
+
 
      // =================================================================
     // 2. DATA FETCHING & LOGIC (useEffect, useCallback, Handlers)
@@ -124,7 +128,7 @@ const MainPanel = ({ telegramUser }) => {
           setIsLoadingProducts(true);
           setProductError(null);
           try {
-              const apiUrl = `${API_BASE_URL}/api/products?page=1&limit=${PRODUCTS_PER_PAGE}`;
+              const apiUrl = `${API_BASE_URL}/api/products?page=1&limit=${PRODUCTS_PER_PAGE}&cityId=${selectedCityId}`;
               const response = await fetch(apiUrl);
               if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
               const data = await response.json();
@@ -137,82 +141,117 @@ const MainPanel = ({ telegramUser }) => {
               setIsLoadingProducts(false);
           }
         };
+         if (selectedCityId) {
         fetchInitialProducts();
-    }, []);
+          }
+    }, [selectedCityId]);
 
-    useEffect(() => {
-        const fetchSuppliers = async () => {
-            setIsLoadingSuppliers(true);
-            setSupplierError(null);
-            try {
-                const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/suppliers`;
-                console.log("Fetching suppliers from:", apiUrl);
-                const response = await fetch(apiUrl);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const data = await response.json();
-                setFetchedSuppliers(data);
-            } catch (error) {
-                console.error("Failed to fetch suppliers:", error);
-                setSupplierError(error.message);
-            } finally {
-                setIsLoadingSuppliers(false);
-            }
-        };
-    
-        fetchSuppliers();
-    }, []); // Empty dependency array, runs once on mount
+// In src/components/MainPanel.jsx
 
-    useEffect(() => {
-        const fetchFeaturedItems = async () => {
-            setIsLoadingFeaturedItems(true);
-            setFeaturedItemsError(null);
-            setFeaturedItemsData([]); // Clear previous items before fetching
-    
-            try {
-                const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/featured-items`;
-                console.log("Fetching REAL featured items from:", apiUrl); // Log API call
-                const response = await fetch(apiUrl);
-    
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({})); // Try to get error details
-                    throw new Error(errorData.error || `Failed to fetch featured items: ${response.statusText}`);
-                }
-                const data = await response.json(); // This should be an array from your backend
-                
-                console.log("REAL featured items received:", data); // Log received data
-                setFeaturedItemsData(data || []); // Set data, or empty array if data is null/undefined
-    
-            } catch (error) {
-                console.error("Failed to fetch featured items:", error);
-                setFeaturedItemsError(error.message);
-                setFeaturedItemsData([]); // Ensure it's an empty array on error
-            } finally {
-                setIsLoadingFeaturedItems(false);
+// [CITY_FILTER] UPDATED useEffect to fetch suppliers by city
+useEffect(() => {
+    const fetchSuppliers = async () => {
+        // Don't run if no city is selected yet
+        if (!selectedCityId) return;
+
+        setIsLoadingSuppliers(true);
+        setSupplierError(null);
+        setFetchedSuppliers([]); // Clear previous results when city changes
+        
+        try {
+            // Append the cityId to the API URL
+            const apiUrl = `${API_BASE_URL}/api/suppliers?cityId=${selectedCityId}`;
+            console.log("Fetching suppliers from:", apiUrl);
+
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
-        };
-    
-        fetchFeaturedItems();
-    }, [import.meta.env.VITE_API_BASE_URL]); // Re-fetch if base URL changes (shouldn't often)
-                                          // Add other dependencies if needed (e.g., if featured items depend on user login state, add that user state)
+            const data = await response.json();
+            setFetchedSuppliers(data);
+        } catch (error) {
+            console.error("Failed to fetch suppliers:", error);
+            setSupplierError(error.message);
+        } finally {
+            setIsLoadingSuppliers(false);
+        }
+    };
+
+    fetchSuppliers();
+}, [selectedCityId]); // Add selectedCityId to the dependency array
+
+   // In src/components/MainPanel.jsx
+
+// [CITY_FILTER] UPDATED useEffect to fetch featured items by city
+useEffect(() => {
+const fetchFeaturedItems = async () => {
+setIsLoadingFeaturedItems(true);
+setFeaturedItemsError(null);
+setFeaturedItemsData([]); // Clear previous items before fetching
+try {
+            const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/featured-items`;
+            console.log("Fetching REAL featured items from:", apiUrl); // Log API call
+            const response = await fetch(apiUrl);
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({})); // Try to get error details
+                throw new Error(errorData.error || `Failed to fetch featured items: ${response.statusText}`);
+            }
+            const data = await response.json(); // This should be an array from your backend
+            
+            console.log("REAL featured items received:", data); // Log received data
+            setFeaturedItemsData(data || []); // Set data, or empty array if data is null/undefined
+
+        } catch (error) {
+            console.error("Failed to fetch featured items:", error);
+            setFeaturedItemsError(error.message);
+            setFeaturedItemsData([]); // Ensure it's an empty array on error
+        } finally {
+            setIsLoadingFeaturedItems(false);
+        }
+    };
+
+    fetchFeaturedItems();
+}, [import.meta.env.VITE_API_BASE_URL]); // Re-fetch if base URL changes (shouldn't often)
+                                      // Add other dependencies if needed (e.g., if featured items depend on user login state, add that user state)
 
      // --- Fetch Data on Tab Change ---
-    useEffect(() => {
-        const fetchDealsData = async () => {
-            if (activeSection !== 'exhibitions' || fetchedDeals.length > 0) return;
-            setIsLoadingDeals(true);
-            setDealError(null);
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/deals`);
-                if (!response.ok) throw new Error('Failed to fetch deals');
-                const data = await response.json();
-                setFetchedDeals(data);
-            } catch (error) { setDealError(error.message); } 
-            finally { setIsLoadingDeals(false); }
-        };
-        fetchDealsData();
-    }, [activeSection]);
+   // In src/components/MainPanel.jsx
+
+// [CITY_FILTER] UPDATED useEffect to fetch deals by city
+useEffect(() => {
+    const fetchDealsData = async () => {
+        // Don't run if the tab isn't active or if no city is selected yet
+        if (activeSection !== 'exhibitions' || !selectedCityId) {
+            // If the tab is not active, we can clear old deals to ensure a fresh load next time
+            if (activeSection !== 'exhibitions') {
+                setFetchedDeals([]);
+            }
+            return;
+        }
+
+        setIsLoadingDeals(true);
+        setDealError(null);
+        setFetchedDeals([]); // Clear previous results when tab becomes active or city changes
+
+        try {
+            // Append the cityId to the API URL
+            const apiUrl = `${API_BASE_URL}/api/deals?cityId=${selectedCityId}`;
+            console.log("Fetching deals from:", apiUrl);
+
+            const response = await fetch(apiUrl);
+            if (!response.ok) throw new Error('Failed to fetch deals');
+            const data = await response.json();
+            setFetchedDeals(data);
+        } catch (error) { 
+            setDealError(error.message); 
+        } finally { 
+            setIsLoadingDeals(false); 
+        }
+    };
+
+    fetchDealsData();
+}, [activeSection, selectedCityId]); // Add selectedCityId to the dependency array
     
     useEffect(() => {
         const fetchUserOrders = async () => {
@@ -350,34 +389,43 @@ const MainPanel = ({ telegramUser }) => {
     }, [telegramUser?.id, doFetchCart]);
 
      // --- Search Logic ---
-    useEffect(() => {
-        const performSearch = async () => {
-            const trimmedTerm = debouncedSearchTerm.trim();
-            if (trimmedTerm.length < 3) {
-                setShowSearchResultsView(false);
-                setSearchResults({ products: { items: [], totalItems: 0 }, deals: [], suppliers: [] });
-                return;
-            }
-            
-            setIsSearching(true);
-            setSearchError(null);
-            setShowSearchResultsView(true);
-            
-            try {
-                const apiUrl = `${API_BASE_URL}/api/search?searchTerm=${encodeURIComponent(trimmedTerm)}&limit=${PRODUCT_LIMIT_FOR_SEARCH}`;
-                const response = await fetch(apiUrl);
-                if (!response.ok) throw new Error('Search request failed');
-                const data = await response.json();
-                setSearchResults(data.results);
-            } catch (error) {
-                setSearchError(error.message);
-            } finally {
-                setIsSearching(false);
-            }
-        };
+    // In src/components/MainPanel.jsx
 
-        performSearch();
-    }, [debouncedSearchTerm]);
+// [CITY_FILTER] UPDATED useEffect for search to include cityId
+useEffect(() => {
+    const performSearch = async () => {
+        // Don't run if no city is selected yet
+        if (!selectedCityId) return;
+
+        const trimmedTerm = debouncedSearchTerm.trim();
+        if (trimmedTerm.length < 3) {
+            setShowSearchResultsView(false);
+            setSearchResults({ products: { items: [], totalItems: 0 }, deals: [], suppliers: [] });
+            return;
+        }
+        
+        setIsSearching(true);
+        setSearchError(null);
+        setShowSearchResultsView(true);
+        
+        try {
+            // Append the cityId to the API URL
+            const apiUrl = `${API_BASE_URL}/api/search?searchTerm=${encodeURIComponent(trimmedTerm)}&cityId=${selectedCityId}&limit=${PRODUCT_LIMIT_FOR_SEARCH}`;
+            console.log(`[Search] Searching from: ${apiUrl}`);
+
+            const response = await fetch(apiUrl);
+            if (!response.ok) throw new Error('Search request failed');
+            const data = await response.json();
+            setSearchResults(data.results);
+        } catch (error) {
+            setSearchError(error.message);
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
+    performSearch();
+}, [debouncedSearchTerm, selectedCityId]); // Add selectedCityId to the dependency array
 
 
     // --- Handler Functions ---
@@ -703,100 +751,74 @@ const handleLoadMoreProducts = async () => {
     }
 };
 
- const handleCheckout = async () => {
-    if (!telegramUser?.id) {
-        alert("User information not available. Please try again.");
-        return;
-    }
-    if (cartItems.length === 0) {
-        alert("Your cart is empty.");
-        return;
-    }
-
-    setIsLoadingProfile(true); // Show loading indicator for profile check
-    setProfileError(null);
-    setShowAddressModal(false); // Ensure modal is hidden initially
-
-    try {
-        const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/user/profile?userId=${telegramUser.id}`;
-        const response = await fetch(apiUrl);
-
-        if (response.ok) { // Profile exists
-            const profileData = await response.json();
-            setUserProfile(profileData);
-            // Pre-fill address form state if needed, though maybe not necessary if just proceeding
-            setAddressFormData({
-                fullName: profileData.full_name || '',
-                phoneNumber: profileData.phone_number || '',
-                addressLine1: profileData.address_line1 || '',
-                addressLine2: profileData.address_line2 || '',
-                city: profileData.city || '',
-            });
-            console.log("Profile found:", profileData);
-            await proceedToCreateOrder(); // Directly proceed to order creation
-        } else if (response.status === 404) { // Profile not found
-            console.log("Profile not found, showing address modal.");
-            // Pre-fill with Telegram user's first/last name if available
-            setAddressFormData(prev => ({
-                ...prev,
-                fullName: `${telegramUser.first_name || ''} ${telegramUser.last_name || ''}`.trim()
-            }));
-            setShowAddressModal(true);
-        } else { // Other error
-            throw new Error(`Failed to fetch profile: ${response.status}`);
+const handleCheckout = async () => {
+        if (!telegramUser?.id || cartItems.length === 0) {
+            alert("User information not available or cart is empty.");
+            return;
         }
-    } catch (error) {
-        console.error("Error during profile check:", error);
-        setProfileError(error.message);
-        alert(`Error checking your profile: ${error.message}`);
-    } finally {
-        setIsLoadingProfile(false);
-    }
-};
+
+        setShowAddressModal(false);
+        setProfileError(null);
+
+        // Check the profile prop passed down from App.jsx
+        if (userProfile && userProfile.full_name && userProfile.phone_number && userProfile.address_line1 && userProfile.city) {
+            console.log("Profile is complete. Proceeding directly to create order.");
+            await proceedToCreateOrder();
+        } else {
+            console.log("Profile is incomplete, showing address modal for completion.");
+            setAddressFormData({
+                fullName: userProfile?.full_name || `${telegramUser.first_name || ''} ${telegramUser.last_name || ''}`.trim(),
+                phoneNumber: userProfile?.phone_number || '',
+                addressLine1: userProfile?.address_line1 || '',
+                addressLine2: userProfile?.address_line2 || '',
+                city:userProfile?.address_city_text || userProfile?.selected_city_name || '',
+            });
+            setShowAddressModal(true);
+        }
+    };
+
+
 
 const handleSaveProfile = async (e) => {
-    e.preventDefault(); // Prevent default form submission
-    if (!telegramUser?.id) {
-        alert("User information not available.");
-        return;
-    }
+        e.preventDefault();
+        if (!telegramUser?.id) return;
 
-    // Add specific loading state for profile save if 'isPlacingOrder' feels wrong
-    setIsPlacingOrder(true); // Or use setIsLoadingProfile if more appropriate
-    setProfileError(null); // Clear previous errors
+        setIsPlacingOrder(true);
+        setProfileError(null);
 
-    try {
-        const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/api/user/profile`;
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                userId: telegramUser.id,
-                ...addressFormData // Send all form data
-            }),
-        });
+        try {
+            const apiUrl = `${API_BASE_URL}/api/user/profile`;
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: telegramUser.id,
+                    ...addressFormData
+                }),
+            });
 
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ message: "Failed to save profile." }));
-            throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+            }
+
+            // --- THIS IS THE KEY ---
+            // 1. Call the function passed down from App.jsx to trigger a profile refetch.
+            onProfileUpdate();
+            
+            // 2. Close the modal.
+            setShowAddressModal(false);
+
+            // 3. Now that the profile is saved, proceed to create the order.
+            await proceedToCreateOrder();
+
+        } catch (error) {
+            console.error("Error saving profile:", error);
+            setProfileError(error.message); // Show error in the modal
+        } finally {
+            setIsPlacingOrder(false);
         }
-
-        const savedProfile = await response.json();
-        setUserProfile(savedProfile); // Update local profile state
-        setShowAddressModal(false); // Hide modal on success
-        console.log("Profile saved:", savedProfile);
-
-        // Now that profile is saved, proceed to create the order
-        await proceedToCreateOrder();
-
-    } catch (error) {
-        console.error("Error saving profile:", error);
-        setProfileError(error.message); // Show error in the modal
-        // alert(`Error saving profile: ${error.message}`); // Or use an alert
-    } finally {
-        setIsPlacingOrder(false); // Or setIsLoadingProfile(false)
-    }
-};
+    };
 
 const proceedToCreateOrder = async () => {
     if (!telegramUser?.id) {
@@ -845,6 +867,21 @@ setShowCart(false);     // Close the cart sidebar
         setIsPlacingOrder(false);
     }
 };
+const handleCityChange = async (city) => {
+        if (!telegramUser || !city) return;
+        try {
+            await fetch(`${API_BASE_URL}/api/user/profile`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: telegramUser.id, selected_city_id: city.id }),
+            });
+            // Trigger the profile refresh in App.jsx
+            onProfileUpdate();
+        } catch (err) {
+            console.error("Failed to change city:", err);
+        }
+    };
+
 
 const handleViewAllSupplierProducts = (supplierName) => {
         setShowSupplierDetailModal(false);
@@ -861,6 +898,30 @@ const handleViewAllSupplierProducts = (supplierName) => {
                 <div className="p-4 max-w-4xl mx-auto">
                     <div className="flex items-center justify-between mb-4">
                         <h1 className="text-xl font-bold text-gray-800">معرض المستلزمات الطبية</h1>
+                        <div className="flex items-center gap-1 sm:gap-2">
+                            <div className="relative">
+                                <button
+                                    onClick={() => setIsCityPopoverOpen(prev => !prev)}
+                                    className="flex items-center gap-1.5 p-2 text-gray-600 hover:text-blue-600 rounded-lg hover:bg-gray-100 transition-colors"
+                                    title="Change City"
+                                >
+                                    <span className="text-sm font-medium hidden sm:inline">
+                                        {userProfile?.selected_city_name || 'اختر مدينة'}
+                                    </span>
+                                    <MapPin className="h-6 w-6" />
+                                </button>
+                                
+                                <AnimatePresence>
+                                    {isCityPopoverOpen && (
+                                        <CityChangePopover
+                                            apiBaseUrl={API_BASE_URL}
+                                            currentCityId={userProfile?.selected_city_id}
+                                            onCitySelect={handleCityChange}
+                                            onClose={() => setIsCityPopoverOpen(false)}
+                                        />
+                                    )}
+                                </AnimatePresence>
+                            </div>
                         <button onClick={() => setShowCart(true)} className="relative p-2 text-gray-600 hover:text-blue-600">
                             <ShoppingCart className="h-6 w-6" />
                             {cartItems.length > 0 && (
@@ -869,6 +930,7 @@ const handleViewAllSupplierProducts = (supplierName) => {
                                 </span>
                             )}
                         </button>
+                    </div>
                     </div>
                     <div className="relative mb-4">
                         <input
