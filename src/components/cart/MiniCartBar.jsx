@@ -6,8 +6,8 @@ import { X, Plus, Minus, Trash2, ShoppingCart } from 'lucide-react';
 const MiniCartBar = ({ cartItems, showActiveItemControls, activeMiniCartItem, onIncrease, onDecrease, onRemove, onHideActiveItem, onViewCart }) => {
     const totalCartPrice = cartItems.reduce((total, item) => {
         const price = item.effective_selling_price ?? 0;
-        return total + (parseFloat(price) * item.quantity);
-    }, 0).toFixed(2);
+        return total + (formatPrice(price) * item.quantity);
+    }, 0);
     const totalCartItems = cartItems.reduce((acc, item) => acc + item.quantity, 0);
 
     const renderActiveItemControls = () => {
@@ -71,7 +71,7 @@ console.log("MiniCartBar: displayItem =", displayItem); // 👈 Paste this here
                                     <ShoppingCart className="h-6 w-6" />
                                     <span className="absolute -top-2 -right-2 bg-white text-blue-600 rounded-full w-5 h-5 text-xs flex items-center justify-center font-bold">{totalCartItems}</span>
                                 </div>
-                                <div className="font-bold text-lg">{totalCartPrice} د.إ</div>
+                                <div className="font-bold text-lg">{totalCartPrice} </div>
                             </div>
                             <button onClick={onViewCart} className="bg-white hover:bg-gray-200 text-blue-600 px-6 py-2.5 rounded-lg text-sm font-semibold shadow-md transition-colors">
                                 عرض السلة

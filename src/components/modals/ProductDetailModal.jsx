@@ -2,9 +2,11 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { X, ShoppingCart, Heart, AlertTriangle, ChevronsRight } from 'lucide-react';
+import { useCurrency } from '../../context/CurrencyContext';
 
 // A new sub-component for cleanly displaying an alternative product suggestion
 const AlternativeProductCard = ({ product, onSelect }) => (
+
     <div 
         onClick={() => onSelect(product.id)}
         className="flex items-center gap-4 p-3 bg-blue-50 hover:bg-blue-100 rounded-lg cursor-pointer transition-colors"
@@ -17,8 +19,7 @@ const AlternativeProductCard = ({ product, onSelect }) => (
         </div>
         <div className="text-right">
             <p className="font-bold text-lg text-blue-700">
-                {parseFloat(product.effective_selling_price).toFixed(2)} د.إ
-            </p>
+                {parseFloat(product.effective_selling_price)}             </p>
         </div>
         <ChevronsRight className="h-5 w-5 text-blue-500 flex-shrink-0" />
     </div>
@@ -26,7 +27,7 @@ const AlternativeProductCard = ({ product, onSelect }) => (
 
 const ProductDetailModal = ({ show, onClose, productData, isLoading, error, onAddToCart, onToggleFavorite, onSelectAlternative }) => {
     // The main prop is now `productData` which holds our { originalProduct, ... } object
-    
+    const { formatPrice } = useCurrency();
     if (!show) return null;
 
     // Destructure the data for easier access inside the component
@@ -91,8 +92,7 @@ const ProductDetailModal = ({ show, onClose, productData, isLoading, error, onAd
                             )}
                             <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
                                 <p className={`text-4xl font-extrabold ${isAvailable ? 'text-blue-600' : 'text-gray-400 line-through'}`}>
-                                    {parseFloat(originalProduct.effective_selling_price).toFixed(2)} د.إ
-                                </p>
+                                    {formatPrice(originalProduct.effective_selling_price)}                                </p>
                             </div>
                         </div>
                         

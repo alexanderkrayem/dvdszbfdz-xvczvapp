@@ -2,14 +2,16 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { X, Plus, Minus, Trash2 } from 'lucide-react';
+import { useCurrency } from '../../context/CurrencyContext';
 
 const CartSidebar = ({ show, onClose, cartItems, isLoading, error, onIncrease, onDecrease, onRemove, onCheckout, isPlacingOrder, pendingUpdate }) => {
+    const { formatPrice } = useCurrency();
     if (!show) return null;
 
     const total = cartItems.reduce((total, item) => {
         const price = item.effective_selling_price ?? 0;
-        return total + (parseFloat(price) * item.quantity);
-    }, 0).toFixed(2);
+        return total + (formatPrice(price) * item.quantity);
+    }, 0);
   console.log('[DEBUG] Rendering CartSidebar with items:', cartItems);
     return (
         <motion.div
@@ -34,7 +36,7 @@ const CartSidebar = ({ show, onClose, cartItems, isLoading, error, onIncrease, o
                         <div className="h-16 w-16 rounded-lg flex-shrink-0 bg-cover bg-center" style={{ backgroundImage: `url(${item.image_url})` }}></div>
                         <div className="flex-1 min-w-0">
                             <h3 className="font-medium truncate">{item.name}</h3>
-                          <div className="text-blue-600">{item.effective_selling_price} د.إ</div>
+                          <div className="text-blue-600">{item.effective_selling_price} </div>
                         </div>
                         <div className="flex items-center gap-1 flex-shrink-0">
                             <button onClick={() => onDecrease(item.product_id)} disabled={pendingUpdate} className="p-1.5 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-50"><Minus className="h-4 w-4" /></button>
@@ -48,7 +50,7 @@ const CartSidebar = ({ show, onClose, cartItems, isLoading, error, onIncrease, o
 
             {!isLoading && cartItems.length > 0 && (
                 <div className="p-4 mt-auto border-t flex-shrink-0">
-                    <div className="flex justify-between items-center mb-4"><span className="font-bold">المجموع:</span><span className="font-bold">{total} د.إ</span></div>
+                    <div className="flex justify-between items-center mb-4"><span className="font-bold">المجموع:</span><span className="font-bold">{total} </span></div>
                     <button onClick={onCheckout} disabled={isPlacingOrder || cartItems.length === 0} className="w-full bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50">
                         {isPlacingOrder ? "جار إنشاء الطلب..." : "إتمام الشراء"}
                     </button>

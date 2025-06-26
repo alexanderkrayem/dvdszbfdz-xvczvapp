@@ -2,8 +2,10 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { ShoppingCart, Heart } from 'lucide-react';
+import { useCurrency } from '../../context/CurrencyContext';
 
 const ProductCard = ({ product, onAddToCart, onToggleFavorite, onShowDetails, isFavorite }) => {
+    const { formatPrice } = useCurrency();
     const handleImageError = (e) => {
         e.currentTarget.style.display = 'none';
         const placeholder = e.currentTarget.parentElement.querySelector('.image-placeholder-text');
@@ -35,8 +37,8 @@ const ProductCard = ({ product, onAddToCart, onToggleFavorite, onShowDetails, is
                 <h3 className="font-semibold text-sm mb-1 text-gray-800 flex-grow min-h-[2.5em] line-clamp-2">{product.name}</h3>
                 <div className="flex items-end justify-between mt-auto">
                     <div>
-                        {product.is_on_sale && product.discount_price && (<span className="text-xs line-through text-gray-400 mr-1">{parseFloat(product.effective_selling_price).toFixed(2)} د.إ</span>)}
-                        <div className="text-blue-600 font-bold text-base">{parseFloat(product.is_on_sale && product.discount_price ? product.discount_price : product.effective_selling_price).toFixed(2)} د.إ</div>
+                        {product.is_on_sale && product.discount_price && (<span className="text-xs line-through text-gray-400 mr-1">{parseFloat(product.effective_selling_price)} </span>)}
+                        <div className="text-blue-600 font-bold text-base">{formatPrice(product.is_on_sale && product.discount_price ? product.discount_price : product.effective_selling_price)} </div>
                     </div>
                     <button onClick={(e) => { e.stopPropagation(); onAddToCart(product);}} className="p-2 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-500 hover:text-white">
                         <ShoppingCart className="h-4 w-4" />

@@ -3,6 +3,9 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ShoppingCart, Search, X, MapPin } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 
+
+
+
 // Import Custom Hooks and All New Components
 import { useDebounce } from '../hooks/useDebounce';
 import FeaturedSlider from './FeaturedSlider';
@@ -900,28 +903,36 @@ const handleViewAllSupplierProducts = (supplierName) => {
                         <h1 className="text-xl font-bold text-gray-800">معرض المستلزمات الطبية</h1>
                         <div className="flex items-center gap-1 sm:gap-2">
                             <div className="relative">
-                                <button
-                                    onClick={() => setIsCityPopoverOpen(prev => !prev)}
-                                    className="flex items-center gap-1.5 p-2 text-gray-600 hover:text-blue-600 rounded-lg hover:bg-gray-100 transition-colors"
-                                    title="Change City"
-                                >
-                                    <span className="text-sm font-medium hidden sm:inline">
-                                        {userProfile?.selected_city_name || 'اختر مدينة'}
-                                    </span>
-                                    <MapPin className="h-6 w-6" />
-                                </button>
-                                
-                                <AnimatePresence>
-                                    {isCityPopoverOpen && (
-                                        <CityChangePopover
-                                            apiBaseUrl={API_BASE_URL}
-                                            currentCityId={userProfile?.selected_city_id}
-                                            onCitySelect={handleCityChange}
-                                            onClose={() => setIsCityPopoverOpen(false)}
-                                        />
-                                    )}
-                                </AnimatePresence>
-                            </div>
+    <button
+        onClick={() => setIsCityPopoverOpen(prev => !prev)}
+        className="flex items-center gap-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 p-2 rounded-lg transition-colors max-w-[160px]"
+        title="Change City"
+    >
+        {/* Icon is now first for better alignment */}
+        <MapPin className="h-5 w-5 text-gray-500 flex-shrink-0" />
+
+        {/* 
+            THIS IS THE CORRECTED SPAN:
+            The `hidden` and `sm:inline` classes have been removed.
+            The `truncate` class is added to handle long city names gracefully.
+        */}
+        <span className="truncate">
+            {userProfile?.selected_city_name || 'اختر مدينة'}
+        </span>
+
+    </button>
+    
+    <AnimatePresence>
+        {isCityPopoverOpen && (
+            <CityChangePopover
+                apiBaseUrl={API_BASE_URL}
+                currentCityId={userProfile?.selected_city_id}
+                onCitySelect={handleCityChange}
+                onClose={() => setIsCityPopoverOpen(false)}
+            />
+        )}
+    </AnimatePresence>
+</div>
                         <button onClick={() => setShowCart(true)} className="relative p-2 text-gray-600 hover:text-blue-600">
                             <ShoppingCart className="h-6 w-6" />
                             {cartItems.length > 0 && (
