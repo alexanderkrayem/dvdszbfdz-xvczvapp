@@ -12,6 +12,8 @@ const ProductCard = ({ product, onAddToCart, onToggleFavorite, onShowDetails, is
         if (placeholder) placeholder.style.display = 'flex';
     };
 
+
+    
     return (
         <motion.div
             className="bg-white rounded-xl shadow-md overflow-hidden cursor-pointer flex flex-col z-0"
